@@ -1,0 +1,13 @@
+sharedPrefs
+01_startSellingBNB.py
+99_createLimitOrders_manual_BNB.py
+99_strategyStayOnTheRightSide_backup.py
+__pycache__
+createLimitOrders_manual.py
+findArbitrageOfFive.py
+findArbitrageofThree.py
+findExtremes.py
+jsonTriggerFiles
+responseJsonExamples
+xTest.py
+ytraderRunner_testing.py
