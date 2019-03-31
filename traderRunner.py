@@ -20,10 +20,11 @@ traderFunctions.startLoggers()
 ######################################################
 strats = {}
 mandatoryInitVars = {}
-sharedPrefFileGuardian = 'emailNotification_guardian_lastClbkTime'
+sharedPrefFileGuardian = 'guardian_lastClbkTime'
 sharedPrefFileSkipClbkMsgDueDelay = 'lastTimeAClbkMsgWasSkipepd'
 stopFlagFileName = 'runnerSTOPFlag_anyContentWillStop.txt'
-guardianLoopingTimeInMin = 30
+# daj pozor aky mas max limit pri sys.setrecursionlimit(), pre 1500 rekurzii pri 20min loope to vystaci na 20 dni
+guardianLoopingTimeInMin = 10
 clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardianLoopingTimeInMin)
 scriptLocationPath = traderFunctions.getScriptLocationPath(0)
 
@@ -47,7 +48,11 @@ traderFunctions.checkTimeSyncErrAndLoop(clients['tibRick'], 20, 300)
 ######################################################
 #############		HELPER FUNCTIONS	##############
 ######################################################		
-	
+
+def logJsonsWhichWillRun(dict):
+	for k, d in globalVariablesDictionary.items():
+		traderFunctions.ploggerInfo('The json with key ' + k + ' will run', True)
+
 def updateJsons (dicsToBeUpdated):
 	for k, v in dicsToBeUpdated.items():
 		# pre nove dict automaticky vytvori novy file
@@ -116,7 +121,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 	traderFunctions.ploggerInfo('Guardian is checking if the the websocket is still alive')
 	
 	#check if the clbk fcion did write in the last sleepTimeInMin
-	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
+	if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
 		# if did not write, that means the clbk is not running
 		traderFunctions.ploggerErr ('Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago. Will try to restart the socket')
 		closeSocketAndRestartThisFile(True)
@@ -125,7 +130,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 		
 def getTimeFromClbkMsg(msg):
 	try:
-		gotTime = msg[1].get('E', 'Null')
+		gotTime = msg[0].get('E', 'Null')
 	except (IndexError):
 		return None
 	
@@ -143,6 +148,9 @@ def getTimeFromClbkMsg(msg):
 def trader_callbck(msg):
 	global globalVariablesDictionary
 	global clbkCounterForGuardian
+	
+	# musi byt tu, lebo inak pri skippovani nezarata tento loop
+	clbkCounterForGuardian -= 1
 
 	if (type(msg) == 'dict'):
 		traderFunctions.ploggerErr('The message from the websocket is a dictionary, but should be a list - maybe an error appeared')
@@ -150,7 +158,7 @@ def trader_callbck(msg):
 			traderFunctions.ploggerErr('Websocket returned the following error:\n ' + msg['m'])
 			closeSocketAndRestartThisFile(True)
 			# making sure this file will not continue to run (should not get to this point anyway)
-			traderFunctions.ploggerWarn('Have got to a point where I should not be')
+			traderFunctions.ploggerErr('Have got to a point where I should not be')
 			sys.exit()
 			return
 	
@@ -162,14 +170,14 @@ def trader_callbck(msg):
 	
 	# skip if time difference is bigger than 2sec (2000 mSec) - since it can happen, that my clbk processing will be slower than the interval of the clbks (1 sec)
 	if( (1000 * time.time() - timeFromClbkMsg) > 1500 ):
-		traderFunctions.ploggerWarn('Websocket - The timestamp in the clbk msg is in the past. The difference is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
+		traderFunctions.ploggerInfo('Warn - Websocket - The timestamp in the clbk msg is in the past. The difference is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
 		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
-			traderFunctions.ploggerWarn('Websocket - Did NOT skip a clbk msg in the last 2 seconds, so skipping this one', False)
+			traderFunctions.ploggerInfo('Warn - Websocket - Did NOT skip a clbk msg in the last 2 seconds, so skipping this one', False)
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
 		else:
-			traderFunctions.ploggerWarn('Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
+			traderFunctions.ploggerInfo('Warn - Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
 	
 	symbolPricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 		
@@ -184,7 +192,6 @@ def trader_callbck(msg):
 		globalVariablesDictionary.update(tmp)
 		updateJsons(tmp)
 	
-	clbkCounterForGuardian -= 1
 	if ( clbkCounterForGuardian < 1 ):
 		traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 		clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardianLoopingTimeInMin)
@@ -217,7 +224,7 @@ traderFunctions.ploggerInfo ('Gathering all strategies and all mandatoryInitVars
 for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__name__ + "."):
 	module = __import__(modname, fromlist="dummy")
 	#modname[len(strat.__name__) + 1 : ] ti vrati nazov modulu bez package a prefix (nazov foldra)
-	traderFunctions.ploggerInfo ('Found the strategy "' + modname + '". It will be accesible under the key "' + modname[len(strat.__name__) + 1 : ] + '"')
+	traderFunctions.ploggerInfo ('Found the strategy "' + modname + '". It will be accesible under the key "' + modname[len(strat.__name__) + 1 : ] + '"', True)
 	strats[modname[len(strat.__name__) + 1 : ]] = getattr(module,'trade')
 	mandatoryInitVars[modname[len(strat.__name__) + 1 : ]] = getattr(module,'mandatoryInitVars')
 	
@@ -227,6 +234,7 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)
+logJsonsWhichWillRun(globalVariablesDictionary)
 # write the epoch time for the independent check, if the script is running
 traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 

@@ -170,14 +170,18 @@ def getScriptLocationPath(numberOfFoldersToMoveUp=0):
 			return fullPath
 
 #################  CONVERT BINANCE TIMESTAMPT TO READABLE DATE ################
-def convertEpochToTimestamp(ts_epoch, format='%Y-%m-%d %H:%M:%S'):
-	ts = datetime.datetime.fromtimestamp(int(ts_epoch) / 1000).strftime(format)
+def convertEpochToTimestamp(ts_epoch, epochInMiliseconds=True, format='%Y-%m-%d %H:%M:%S'):
+	if (epochInMiliseconds):
+		timeInt = int(ts_epoch) / 1000
+	else:
+		timeInt = int(ts_epoch)
+	ts = datetime.datetime.fromtimestamp(timeInt).strftime(format)
 	return ts
 
 #################  PART OF THE GUARDIAN FUNCTIONALITY ################
 def setclbkCounterForGuardian(loopingTimeInMin):
-	# 1,5 je bezpecnostny koef, napr ked bude checkovat kazdych 30 min tak bude zapisovat 30/1,5 = kazdych 20min
-	writingTimeInSec = int(round(loopingTimeInMin * 60 / 1.5))
+	# 1,05 je bezpecnostny koef
+	writingTimeInSec = int(round(loopingTimeInMin * 60 / 1.05))
 	return writingTimeInSec
 	
 #################  SYTEM TIME ################
@@ -323,17 +327,23 @@ def getFirstEntryInOrderBook(client, sellOrBuy, pair):
 
 ################  SEND EMAIL ################
 def send_email(subject, msg):
-	import smtplib 
-	# creates SMTP session 
-	s = smtplib.SMTP('smtp.volebnyprieskum.sk', 25)
-	
-	# start TLS for security 
-	s.starttls() 
-	s.login("notifications@volebnyprieskum.sk", "Bue5BoL9beF3")
-	#all email attributes such as subject etc is just text
-	message =  "From: notifications@volebnyprieskum.sk\nSubject: " + subject + "\n" + msg
-	s.sendmail("notifications@volebnyprieskum.sk", "novosad.miroslav@gmail.com", message) 
-	s.quit()
+	ploggerInfo('Will send an email with the subject: ' +  subject)
+	try:
+		import smtplib
+		# creates SMTP session 
+		# mozne servre pre tuto schranku najdes na:
+		# https://admin.websupport.sk/sk/email/mailbox/loginInformation/874582?domainId=174657&mailboxId=394385&domain=volebnyprieskum.sk
+		s = smtplib.SMTP('smtp.websupport.sk', 25)
+		# start TLS for security 
+		s.starttls()
+		s.login("notifications@volebnyprieskum.sk", "Bue5BoL9beF3")
+		#all email attributes such as subject etc is just text
+		message =  "From: notifications@volebnyprieskum.sk\nSubject: " + subject + "\n" + msg
+		s.sendmail("notifications@volebnyprieskum.sk", "novosad.miroslav@gmail.com", message) 
+		s.quit()
+	except:
+		#here goes a warning without email, so we wont cause an infinite loop
+		ploggerWarn('Could not send the email out', False)
 
 ################  Check Last Occurence ################
 def checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, timeLimitInSec):
@@ -351,11 +361,10 @@ def checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, timeLimitInSec):
 		ploggerInfo('The event in the file ' + sharedPrefFileName + ' was NOT less than ' + str(timeLimitInSec) + ' seconds ago' )
 		return False
 
-# @Tested
 def writeEventTimeInSharedPrefs(sharedPrefFileName):
 	sharedPrefFileLocation = r"sharedPrefs\\" + sharedPrefFileName + '.json'
 	with open(getScriptLocationPath(0) + "\\" + sharedPrefFileLocation, mode='w') as sharedPrefFileW:
-		json.dump({sharedPrefFileName: int(time.time())}, sharedPrefFileW)
+		json.dump({sharedPrefFileName: int(time.time()), sharedPrefFileName + '_humanTime': convertEpochToTimestamp(time.time(), False)}, sharedPrefFileW)
 		sharedPrefFileW.close()
 
 		
