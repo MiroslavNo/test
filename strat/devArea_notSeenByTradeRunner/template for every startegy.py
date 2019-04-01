@@ -6,16 +6,16 @@ import strategyFunctions
 
 # hodnota objektu je popis a vars zacinajuce 'a_' su mandatory
 mandatoryInitVars = {
-				   "ba_currentState": "",
-				   "ba_epochTimeClimaxSinceLastExchange": "",
-				   "ba_lastExchangePrice_avg": "",
+				   "a_currentState": "",
+				   "a_epochTimeClimaxSinceLastExchange": "",
+				   "a_lastExchangePrice_avg": "",
 				   "a_tradedSymbol": "",
 				   "strategy": "NEVYPLNAS, bere automaticky z nazvu suboru",
 				   "client": "NEVYPLNAS, bere automaticky z nazvu suboru",
 					}
 
 
-def trade(client, symbolPricesFromTicker, jD, backTest=False):
+def trade(client, pricesFromTicker, jD, backTest=False):
 	
 	#*********************************************#
 	#* 	EVERY TRADE FCION HAS TO HAVE - Begin	**#

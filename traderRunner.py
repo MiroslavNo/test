@@ -23,8 +23,8 @@ mandatoryInitVars = {}
 sharedPrefFileGuardian = 'guardian_lastClbkTime'
 sharedPrefFileSkipClbkMsgDueDelay = 'lastTimeAClbkMsgWasSkipepd'
 stopFlagFileName = 'runnerSTOPFlag_anyContentWillStop.txt'
-# daj pozor aky mas max limit pri sys.setrecursionlimit(), pre 1500 rekurzii pri 20min loope to vystaci na 20 dni
-guardianLoopingTimeInMin = 10
+# daj pozor aky mas max limit pri sys.setrecursionlimit(), pre 1500 rekurzii kolko minut, na tolko dni ti to vystaci
+guardianLoopingTimeInMin = 5
 clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardianLoopingTimeInMin)
 scriptLocationPath = traderFunctions.getScriptLocationPath(0)
 
@@ -96,9 +96,12 @@ def closeSocketAndRestartThisFile(boolRestart):
 		pathList = pathname.split("\\")
 		fileName = pathList[len(pathList)-1]
 		
-		traderFunctions.ploggerErr( 'Restarting the websocket' )
 		# executing this file again
+		traderFunctions.ploggerInfo( 'Calling the following command on the cmd: ' + 'python ' + fileName)
 		os.system('python ' + fileName)
+		traderFunctions.ploggerInfo( 'It should not come to this point, but as the previous execution failed, just checking ' )
+	else:
+		print('THIS BAT WINDOW CAN BE CLOSED [only a print]')
 
 # sys.exit() crashuje, ale nie kvoli guardianov, kvoli niecomu inemu
 # sys.exit() by si neporeboval, ak by si nemal guardiana
@@ -169,21 +172,21 @@ def trader_callbck(msg):
 		return
 	
 	# skip if time difference is bigger than 2sec (2000 mSec) - since it can happen, that my clbk processing will be slower than the interval of the clbks (1 sec)
-	if( (1000 * time.time() - timeFromClbkMsg) > 1500 ):
+	if( (1000 * time.time() - timeFromClbkMsg) > 1750 ):
 		traderFunctions.ploggerInfo('Warn - Websocket - The timestamp in the clbk msg is in the past. The difference is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
 		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
-			traderFunctions.ploggerInfo('Warn - Websocket - Did NOT skip a clbk msg in the last 2 seconds, so skipping this one', False)
+			traderFunctions.ploggerInfo('Warn - Websocket - SKIPPING this clbk msg', False)
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
 		else:
 			traderFunctions.ploggerInfo('Warn - Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
 	
-	symbolPricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
+	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 		
 	tmp = {}
 	for k, singleJsonDic in globalVariablesDictionary.items():
-		r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], symbolPricesFromTicker, singleJsonDic)
+		r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
 		if not (r is None):
 			tmp[k] = r
 
@@ -217,9 +220,14 @@ def startTraderSocket():
 #############		LAUNCH			##############
 ######################################################
 
+traderFunctions.ploggerInfo ('\n')
 traderFunctions.ploggerInfo ('Trade Runner started')
 # Gather all strategies and all mandatoryInitVars
 traderFunctions.ploggerInfo ('Gathering all strategies and all mandatoryInitVars')
+
+# making sure stopIfFlagFile is empty
+fw = open(scriptLocationPath + r"\sharedPrefs\\" + stopFlagFileName, mode='w')
+fw.close()
 
 for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__name__ + "."):
 	module = __import__(modname, fromlist="dummy")
