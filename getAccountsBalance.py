@@ -51,7 +51,7 @@ for key in sorted(mno_BTC.keys()):
 sumBalances = Counter(tibRick_BTC) + Counter(mno_BTC)
 
 total_BTC = float(sumBalances.get('total'))
-total_TUSD = total_BTC / traderFunctions.getLastPrice(clients['tibRick'], 'TUSD', 'BTC')
+total_USDT = total_BTC * traderFunctions.getLastPrice(clients['tibRick'], 'BTC', 'USDT')
 total_BTC_tibRick = float(tibRick_BTC.get('total'))
 total_BNB_mno = float(mno_BTC.get('total')) / traderFunctions.getLastPrice(clients['tibRick'], 'BNB', 'BTC')
 
@@ -105,7 +105,7 @@ htmlContent = re.sub(regexPlchldr, plchldr_begin + detailedBalanceSheets_mno, ht
 
 #extend USD chart
 plchldr = '//$$DATACHART_USD$$'
-htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_TUSD, -2)) +", "+ str(spoluVlozene_USD) +", "+ str(spoluPozicane_USD) + "]," + lineBreak + plchldr)
+htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_USDT, -2)) +", "+ str(spoluVlozene_USD) +", "+ str(spoluPozicane_USD) + "]," + lineBreak + plchldr)
 
 #extend BTC chart
 plchldr = '//$$DATACHART_BTC$$'

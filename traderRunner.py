@@ -93,12 +93,13 @@ def closeSocketAndRestartThisFile(boolRestart):
 		# restart file
 		import os
 		pathname = os.path.realpath(sys.argv[0])        
-		pathList = pathname.split("\\")
-		fileName = pathList[len(pathList)-1]
+		# extract only the filename
+		# pathList = pathname.split("\\")
+		# fileName = pathList[len(pathList)-1]
 		
 		# executing this file again
 		traderFunctions.ploggerInfo( 'Calling the following command on the cmd: ' + 'python ' + fileName)
-		os.system('python ' + fileName)
+		os.system('python "' + pathname + '"')
 		traderFunctions.ploggerInfo( 'It should not come to this point, but as the previous execution failed, just checking ' )
 	else:
 		print('THIS BAT WINDOW CAN BE CLOSED [only a print]')
@@ -246,5 +247,14 @@ logJsonsWhichWillRun(globalVariablesDictionary)
 # write the epoch time for the independent check, if the script is running
 traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 
+# TODO following checks for pumpTheRightCoin before startup:
+# 1, grouping of close entries in the jsons
+#	- interate from top to bottom and if 2 with the price closer as 0,1% merge them, the break the loop and loop again (with tis you will have a clean logic how to do it)
+# 2, with client.get_all_orders check if all orders are documented in jsons, if not, then send a err email
+# 3, check if in the meantime are orders which got fillfiled - adjust the jsons accordingly
+# 4, count the amount which should be owned of a coin according to the jsons and compare with the actuall amount of the coin - should not do anything in small discrepancies, because it can be, that an order just got filled, or small discrepancies because of partially filled roders etc.
+# 5, update price requirements for all jsons (u_ variables)
+# 5, pre kazdy ucet budes mat array s velkostou Qty pre jednotlive nakupy, pri starte skritu updatenes aj tieto hodnoty
+# 6, convert small amounts to BNB
 startTraderSocket()
 runGuardian(sharedPrefFileGuardian, guardianLoopingTimeInMin)

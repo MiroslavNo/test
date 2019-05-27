@@ -250,7 +250,8 @@ def getPricesFromClbkMsg(tickerDict):
 		#iterate through LIST
 		for dict in tickerDict:
 			symbol = dict.get('s', 'key not found')
-			if ( (symbol.upper().endswith('BTC')) or (symbol.upper().endswith('USDT')) ):
+			# if ( (symbol.upper().endswith('BTC')) or (symbol.upper().endswith('USDT')) ):
+			if (symbol.upper().endswith('USDT')):
 				result[symbol] = {'c': float(dict.get('c', 0)), 'b': float(dict.get('b', 0)), 'a': float(dict.get('a', 0)), 'q': float(dict.get('q', 0))}
 		return result
 	else:
@@ -327,19 +328,23 @@ def getFirstEntryInOrderBook(client, sellOrBuy, pair):
 
 ################  SEND EMAIL ################
 def send_email(subject, msg):
+	from sharedPrefs import email_config
+	emailDic=email_config.EMAILS['notif']	
+	
 	ploggerInfo('Will send an email with the subject: ' +  subject)
 	try:
 		import smtplib
 		# creates SMTP session 
 		# mozne servre pre tuto schranku najdes na:
 		# https://admin.websupport.sk/sk/email/mailbox/loginInformation/874582?domainId=174657&mailboxId=394385&domain=volebnyprieskum.sk
+		# TODO prerob na sifrovane spojenie
 		s = smtplib.SMTP('smtp.websupport.sk', 25)
 		# start TLS for security 
 		s.starttls()
-		s.login("notifications@volebnyprieskum.sk", "Bue5BoL9beF3")
+		s.login(emailDic['address'], emailDic['pw'])
 		#all email attributes such as subject etc is just text
-		message =  "From: notifications@volebnyprieskum.sk\nSubject: " + subject + "\n" + msg
-		s.sendmail("notifications@volebnyprieskum.sk", "novosad.miroslav@gmail.com", message) 
+		message =  "From: " + emailDic['address'] + "\nSubject: " + subject + "\n" + msg
+		s.sendmail(emailDic['address'], "novosad.miroslav@gmail.com", message) 
 		s.quit()
 	except:
 		#here goes a warning without email, so we wont cause an infinite loop
@@ -367,7 +372,39 @@ def writeEventTimeInSharedPrefs(sharedPrefFileName):
 		json.dump({sharedPrefFileName: int(time.time()), sharedPrefFileName + '_humanTime': convertEpochToTimestamp(time.time(), False)}, sharedPrefFileW)
 		sharedPrefFileW.close()
 
-		
+
+def getPriceAndQtyReqs(tradedSymbol, client):
+	infos = client.get_symbol_info(tradedSymbol)
+	filters = infos.get("filters", None)
+	r = {}
+	
+	if not (filters is None):
+		for filter in filters:
+			if(filter.get("filterType", None) == "PRICE_FILTER"):
+				tickSize = float(filter.get("tickSize", 0.0))
+				minPrice = float(filter.get("minPrice", 0.0))
+				r["tickSize"] = tickSize
+				r["minPrice"] = minPrice
+				#price >= minPrice
+				#(price-minPrice) % tickSize == 0
+			if(filter.get("filterType", None) == "LOT_SIZE"):
+				minQty = float(filter.get("minQty", 0.0))
+				stepSize = float(filter.get("stepSize", 0.0))
+				r["minQty"] = minQty
+				r["stepSize"] = stepSize
+				#quantity >= minQty
+				#(quantity-minQty) % stepSize == 0
+			if(filter.get("filterType", None) == "MIN_NOTIONAL"):
+				applyToMarket = bool(filter.get("applyToMarket", False))
+				if(applyToMarket):
+					minNotional = float(filter.get("minNotional", 0.0))
+					r["minNotional"] = minNotional
+					# Check minimum order size
+					#if ( price * quantity < minNotional ):
+					#	quantity = minNotional / price
+
+	return r
+
 ################  CALCULATES THE StDEV OF A PAIR FOR A GIVEN TIMEFRAME ################
 #REMMIROdef getAverageDeviationOfLastPriceMovements(pair, client_curr, period, interval):
 #REMMIRO	import statistics
