@@ -8,11 +8,12 @@ def calculateExchangePrice(lastExchangePrice_avg, newPriceClimax, desiredDirecti
 			newTargetRatio = ((lastExchangePrice_avg - newPriceClimax) / newPriceClimax) / 2 + startingTargetRatio
 		else:
 			newTargetRatio = startingTargetRatio
-			# we are on the wrong side - using 0.996 as the half of it is 0.2 % and that is the minimum trade diff which is making profit
+			# we are on the wrong side - using 1.004 as the half of it is 0.2 % and that is the minimum trade diff which is making profit
 			#TODO tuto over co to sposobuje, sice by sa to sme nemalo dostat
-			newPriceClimax = lastExchangePrice_avg * 0.996
+			newPriceClimax = lastExchangePrice_avg * 1.004
 		if (newTargetRatio > maxTargetRatio):
 			newTargetRatio = maxTargetRatio
+		print('am here, values are: lastExchangePrice_avg=' + str(lastExchangePrice_avg) + ' newPriceClimax=' + str(newPriceClimax) + 'newTargetRatio=' + str(newTargetRatio))
 		newTargetPrice = lastExchangePrice_avg - ((lastExchangePrice_avg - newPriceClimax) * newTargetRatio)
 		
 	if (desiredDirection == 'limitSell'):
@@ -30,36 +31,6 @@ def calculateExchangePrice(lastExchangePrice_avg, newPriceClimax, desiredDirecti
 	
 	return newTargetPrice
 
-def correctOrderQty(desiredPrice, desiredQty, u_PriceQtyReqs):
-	pass
-def correctOrderPrice(desiredPrice, desiredQty, u_PriceQtyReqs):
-	pass
-
-def getPriceAndQtyReqs(tradedSymbol, client):
-	infos = client.get_symbol_info(tradedSymbol)
-	
-	filters = infos.get("filters", None)
-	
-	if (filters is not None):
-		for filter in filters:
-			if(filter.get("filterType", None) == "PRICE_FILTER"):
-				tickSize = float(filter.get("tickSize", 0.0))
-				minPrice = float(filter.get("minPrice", 0.0))
-				#price >= minPrice
-				#(price-minPrice) % tickSize == 0
-			if(filter.get("filterType", None) == "LOT_SIZE"):
-				minQty = float(filter.get("minQty", 0.0))
-				stepSize = float(filter.get("stepSize", 0.0))
-				#quantity >= minQty
-				#(quantity-minQty) % stepSize == 0
-			if(filter.get("filterType", None) == "MIN_NOTIONAL"):
-				applyToMarket = bool(filter.get("applyToMarket", False))
-				if(applyToMarket):
-					minNotional = float(filter.get("minNotional", 0.0))
-					# Check minimum order size
-					#if ( price * quantity < minNotional ):
-					#	quantity = minNotional / price
-
 
 def isOrderIdFilled(client, tradedSymbol, orderID):
 	# was checking, it is an int, but maybe it could change in the future
@@ -75,3 +46,5 @@ def isOrderIdFilled(client, tradedSymbol, orderID):
 # returns the amount which wasnt filled
 def unfilledAmountFrom(orderID):
 	pass
+
+	

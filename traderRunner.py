@@ -1,6 +1,7 @@
 import pkgutil
 import sys
 import time
+import traceback
 
 import traderFunctions
 import strat
@@ -25,7 +26,8 @@ sharedPrefFileSkipClbkMsgDueDelay = 'lastTimeAClbkMsgWasSkipepd'
 stopFlagFileName = 'runnerSTOPFlag_anyContentWillStop.txt'
 # daj pozor aky mas max limit pri sys.setrecursionlimit(), pre 1500 rekurzii kolko minut, na tolko dni ti to vystaci
 guardianLoopingTimeInMin = 5
-clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardianLoopingTimeInMin)
+# pociatocna hodnota, hned pri prvom loope sa potom nastavi na spravnu
+clbkCounterForGuardian = 0
 scriptLocationPath = traderFunctions.getScriptLocationPath(0)
 
 
@@ -35,6 +37,8 @@ scriptLocationPath = traderFunctions.getScriptLocationPath(0)
 clients = traderFunctions.addClients()
 
 # musi byt globalne, aby si mohol pouzit bm.close() pre restart websocketu
+# TODO toto over ci nie je v rozpore s tym ked chces pouzivat viacero clientov
+# TODO ked si overil a funguje, tak prehod vsetky administrativne ukony na mno
 bm = BinanceSocketManager(clients['tibRick'])
 
 ######################################################
@@ -121,16 +125,15 @@ def stopIfFlag(flagFileName):
 			closeSocketAndRestartThisFile(False)
 
 def runGuardian(sharedPrefFileName, sleepTimeInMin):
-	time.sleep(sleepTimeInMin * 60)
-	traderFunctions.ploggerInfo('Guardian is checking if the the websocket is still alive')
-	
-	#check if the clbk fcion did write in the last sleepTimeInMin
-	if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
-		# if did not write, that means the clbk is not running
-		traderFunctions.ploggerErr ('Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago. Will try to restart the socket')
-		closeSocketAndRestartThisFile(True)
-	else:
-		runGuardian(sharedPrefFileName, sleepTimeInMin)
+	while (True):
+		time.sleep(sleepTimeInMin * 60)
+		traderFunctions.ploggerInfo('Guardian is checking if the the websocket is still alive')
+		
+		#check if the clbk fcion did write in the last sleepTimeInMin
+		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
+			# if did not write, that means the clbk is not running
+			traderFunctions.ploggerErr ('Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago. Will try to restart the socket')
+			closeSocketAndRestartThisFile(True)
 		
 def getTimeFromClbkMsg(msg):
 	try:
@@ -186,10 +189,14 @@ def trader_callbck(msg):
 	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 		
 	tmp = {}
+	# TODO v dalekej buducnosti, malo by to tak fungovat lepsie, ze traderFunctions by si prerobil na classu a dictionary spolu s clientom by boli member variables - tym padom by si nemusel volat funkciu s parametrami, ale vzdy by si iba zavolal metodu trade na danom objecte 
 	for k, singleJsonDic in globalVariablesDictionary.items():
-		r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
-		if not (r is None):
-			tmp[k] = r
+		try:
+			r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
+			if not (r is None):
+				tmp[k] = r
+		except Exception:
+			traderFunctions.ploggerErr('Following traceback error came from the strategy module:\n ' + traceback.format_exc())
 
 	#Empty dictionaries evaluate to False in Python
 	if bool(tmp):
@@ -240,6 +247,11 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 	# POZN:
 	# HLAVNA METODA KAZDEJ STRATGIE = trade():
 	# MANDATORY INIT VARS = mandatoryInitVars
+
+# TODO v buducnu daj viac genericku fciu, kde budes vediet adavat nazvy strategii pre filtre, alebo ako tuto pouzi defaultnu hodnotu ktora updatene setky jsony
+traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['tibRick'], 'u_PriceQtyReqs')
+# VERY DIRTY
+traderFunctions.updateSingleEntryAmounts(clients['tibRick'], 'u_singleEntryAmounts', {"3": 33, "6": 50, "9": 75, "12": 113, "15": 169, "18": 254}, 'pumpTheRightCoin')
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)

@@ -3,6 +3,7 @@ import datetime
 import logging
 import json
 import sys, os
+from decimal import Decimal
 
 
 ######################################################
@@ -115,19 +116,21 @@ def getClientAndStrategyFromFileName(fileName):
 	r['client'] = client
 	return r
 
+def isInitJsonNotTeplate(name):
+	return ( name.endswith('.json') and (not name.endswith('_template.json')) and (not name.endswith('_prefilled.json')) )	
+
 def loadAllInitJsons(requiredInitialValuesDict):
 	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
 	allJsonsDict = {}
 	for file in os.listdir(sharedPrefRootFolder):
-		if file.endswith('.json'):
-			if ((not file.endswith('_template.json')) and (not file.endswith('_prefilled.json'))):
-				with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
-					sharedPrefData = json.load(sharedPrefFile)
-					clientAndStrategyNames = getClientAndStrategyFromFileName(file)
-					sharedPrefData.update(clientAndStrategyNames)
-					if ( checkIfInitVarHasValue( file, sharedPrefData, requiredInitialValuesDict ) ):
-						allJsonsDict[file[:-5]] = sharedPrefData
-					sharedPrefFile.close()
+		if (isInitJsonNotTeplate(file)):
+			with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
+				sharedPrefData = json.load(sharedPrefFile)
+				clientAndStrategyNames = getClientAndStrategyFromFileName(file)
+				sharedPrefData.update(clientAndStrategyNames)
+				if ( checkIfInitVarHasValue( file, sharedPrefData, requiredInitialValuesDict ) ):
+					allJsonsDict[file[:-5]] = sharedPrefData
+				sharedPrefFile.close()
 	return allJsonsDict
 	
 def dumpGlobalVariablesToJson(fileName, globalVariables, scriptLocationPath):
@@ -298,7 +301,10 @@ def	getAvailableAmount(client, coin, roundDigits=2):
 	coinAmount = float(client.get_asset_balance(asset=coin).get('free'))
 	coinAmonutRounded = round(coinAmount, roundDigits)
 	return coinAmonutRounded
-	
+
+def hasAvailableAmount(client, coin, reqAmount):
+	coinAmount = float(client.get_asset_balance(asset=coin).get('free'))
+	return ( reqAmount <= coinAmount)
 	
 ################  GET LAST PRICE ################
 def getLastPrice(client, pair_coin1, pair_coin2):
@@ -378,32 +384,110 @@ def getPriceAndQtyReqs(tradedSymbol, client):
 	filters = infos.get("filters", None)
 	r = {}
 	
-	if not (filters is None):
+	if (filters is not None):
 		for filter in filters:
 			if(filter.get("filterType", None) == "PRICE_FILTER"):
-				tickSize = float(filter.get("tickSize", 0.0))
-				minPrice = float(filter.get("minPrice", 0.0))
+				tickSize = str(filter.get("tickSize", 0.0))
+				minPrice = str(filter.get("minPrice", 0.0))
 				r["tickSize"] = tickSize
 				r["minPrice"] = minPrice
-				#price >= minPrice
-				#(price-minPrice) % tickSize == 0
 			if(filter.get("filterType", None) == "LOT_SIZE"):
-				minQty = float(filter.get("minQty", 0.0))
-				stepSize = float(filter.get("stepSize", 0.0))
-				r["minQty"] = minQty
+				minQty = str(filter.get("minQty", 0.0))
+				stepSize = str(filter.get("stepSize", 0.0))
 				r["stepSize"] = stepSize
-				#quantity >= minQty
-				#(quantity-minQty) % stepSize == 0
+				r["minQty"] = minQty
 			if(filter.get("filterType", None) == "MIN_NOTIONAL"):
 				applyToMarket = bool(filter.get("applyToMarket", False))
 				if(applyToMarket):
-					minNotional = float(filter.get("minNotional", 0.0))
+					minNotional = str(filter.get("minNotional", 0.0))
 					r["minNotional"] = minNotional
-					# Check minimum order size
-					#if ( price * quantity < minNotional ):
-					#	quantity = minNotional / price
 
 	return r
+
+def updatePriceAndQtyReqsInAllJsons(client, keyToBeUpdated, strategyFilter=None):
+	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
+	for file in os.listdir(sharedPrefRootFolder):
+		if (isInitJsonNotTeplate(file)):
+			if ((strategyFilter is None) or ((strategyFilter + '_') in file)):
+				with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
+					sharedPrefData = json.load(sharedPrefFile)
+					tradedSymbol = sharedPrefData.get('a_tradedSymbol', '')
+					if (tradedSymbol != ''):
+						priceReqs_new = getPriceAndQtyReqs(tradedSymbol, client)
+						priceReqs_old = sharedPrefData.get(keyToBeUpdated, '')
+						if (priceReqs_new != priceReqs_old):
+							ploggerInfo('Detected a change in the price and quantity requirements for the symbol ' + tradedSymbol + ' therefore updating the file with the name ' + file + ' now')
+							sharedPrefData[keyToBeUpdated] = priceReqs_new
+							dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
+
+# TODO repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
+def updateSingleEntryAmounts(client, keyToBeUpdated, valToBeUpdated, strategyFilter=None):
+	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
+	for file in os.listdir(sharedPrefRootFolder):
+		if (isInitJsonNotTeplate(file)):
+			if ((strategyFilter is None) or ((strategyFilter + '_') in file)):
+				with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
+					sharedPrefData = json.load(sharedPrefFile)
+					dic_old = sharedPrefData.get(keyToBeUpdated, '')
+					if (valToBeUpdated != dic_old):
+						ploggerInfo('Detected a change in ' + file + ' therefore updating the key ' + keyToBeUpdated + ' now')
+						sharedPrefData[keyToBeUpdated] = valToBeUpdated
+						dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
+
+# TODO v buducnu by tieto 2 fcie mohli byt priamo v binance module a mohol by si mat custom metody napr: order_market_buy_valid			
+
+def validPrice(reqDic, desiredPrice):
+	#price >= minPrice
+	#(price-minPrice) % tickSize == 0
+	
+	minPrice = Decimal(str(reqDic['minPrice']))
+	tickSize = Decimal(str(reqDic['tickSize']))
+	desiredPriceDec = Decimal(str(desiredPrice))
+	
+	if (desiredPriceDec < minPrice):
+		desiredPriceDec = minPrice
+		# according to the docs the price should be string - but both are working
+		return str(desiredPriceDec)
+
+	if not ( (desiredPriceDec - minPrice) % tickSize == 0 ):
+		desiredPriceDec = ( round( (desiredPriceDec - minPrice) / tickSize ) * tickSize) + minPrice
+	# according to the docs the price should be string - but both are working
+	return str(desiredPriceDec)
+
+def validQty(reqDic, desiredPrice, desiredQty, minNotionalSafeCoef = 1.03):
+	""" 
+		-the min notional safe coef is designed for market orders where the price can change
+			-the value can theoretically only be used at the beginning of the ladder
+	"""
+	
+	minNotional = Decimal(str(reqDic['minNotional']))
+	minQty = Decimal(str(reqDic['minQty']))
+	stepSize = Decimal(str(reqDic['stepSize']))
+	
+	desiredPriceDec = Decimal(str(desiredPrice))
+	desiredQtyDec = Decimal(str(desiredQty))
+	minNotionalSafeCoefDec = Decimal(str(minNotionalSafeCoef))
+	
+	# v podmienke nezalezi na minNotionalSafeCoef ale pri vypocte desiredQtyDec uz pozivam radsej Decimal
+	if ( desiredPriceDec * desiredQtyDec < minNotional * minNotionalSafeCoefDec):
+		desiredQtyDec = ( minNotional / desiredPriceDec ) * minNotionalSafeCoefDec
+	
+	if (desiredQtyDec < minQty):
+		desiredQtyDec = minQty
+		return float(desiredQtyDec)
+	if not ( ( desiredQtyDec - minQty ) % stepSize == 0 ):
+		desiredQtyDec = ( round( ( desiredQtyDec - minQty ) / stepSize ) * stepSize ) + minQty 
+	
+	return float(desiredQtyDec)
+
+
+def validPriceAndQty(reqDic, symbol, desiredPrice, desiredQty):
+	return {'symbol': symbol, 'price': validPrice(reqDic, desiredPrice) , 'quantity': validQty(reqDic, desiredPrice, desiredQty)}
+	
+def validLimitPriceAndQty(reqDic, symbol, desiredPrice, desiredQty, limitKoef):
+	tmp = validPriceAndQty(reqDic, symbol, desiredPrice, desiredQty)
+	tmp.update({'stopPrice': validPrice(reqDic, desiredPrice*limitKoef)})
+	return tmp
 
 ################  CALCULATES THE StDEV OF A PAIR FOR A GIVEN TIMEFRAME ################
 #REMMIROdef getAverageDeviationOfLastPriceMovements(pair, client_curr, period, interval):
