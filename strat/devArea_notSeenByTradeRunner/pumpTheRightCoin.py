@@ -13,7 +13,7 @@ mandatoryInitVars = {
 	"strategy": "NEVYPLNAS, bere automaticky z nazvu suboru",
 	"client": "NEVYPLNAS, bere automaticky z nazvu suboru",
 	"a_tradedSymbol": "BTCUSDT",
-	"a_sensitivityForMinimalPriceChange": "percentualna hodnota v absolutnom cisle, ktora musi byt prekrocena, aby po zmene pozicie zacal uvazovat nad tym, ze zmeni poziciu zas (hodnota hovori ze sme dosiahli prvy climax od zmeny pozicie)",
+	"a_sensitivityForMinimalPriceChange": "percentualna hodnota v absolutnom cisle, ktora musi byt prekrocena, aby po zmene pozicie zacal uvazovat nad tym, ze zmeni poziciu zas (hodnota hovori ze sme dosiahli prvy climax od zmeny pozicie) - POUZIVAS AJ AKO PERCENTUALNU HODNOTU PRE DALSI STUPEN LADDERU. Hodnota ma tvar 0.005",
 	"a_maxLoss": "percentualna hodnota v absolutnom cisle, ktora ked je dosiahnuta, tak sa rozhodne prejst na druhu stranu napriek tomu ze je v strate - pouziva sa iba v smere coin to defCoin",
 	"a_maxSlippage": "percentualna hodnota v absolutnom cisle, ktora udava kedy sa nenaplneni order, cez ktore hodnotu trh preletel nma naplnit market orderom",
 	"c_ladderNextPriceLevel": "cena, ktora reprezentuje dalsi stupen na ladderi - pri starte noveho marketu sa nastavi na aktualnu cenu + krok",
@@ -30,7 +30,6 @@ mandatoryInitVars = {
 		"15": 169,
 		"18": 254
 	},
-	"u_ladderStepPerc": 0.005
 	"u_PriceQtyReqs": {
 		"minPrice": "minimal price - najnizsia mozna cena",
 		"tickSize": "minimalna zmena ceny (cela cena delitelna tymto cislom)"
@@ -153,19 +152,22 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 		# 1B, ked je dany market uz nastartovany, tak pokracuje tak je to posledna (najvyssia) cena za ktoru som kupoval
 		
 		# ked je cena dosiahnuta, vytvorim market order
-		return createMarketOrderForNewLadderEntry( client, jD )
+		return createMarketOrderForNewLadderEntry( client, jD, price )
 	
 	# TODO c_ladderBottomBoundary a c_ladderHighestReachedStep sa musia nastavit vtedy, ked budem vymazavat posledny entry a nebude tam uz ziadny iny
 	if (jD['c_ladderHighestReachedStep'] <= 0 and price < jD['c_ladderBottomBoundary']):
 		# ked je to cisto novy init
 		if(jD['c_ladderHighestReachedStep'] == 0):
 			# ked je to cisto novy init, tak posuvam hornu hranicu (a_sensitivityForMinimalPriceChange) dole a vstupujem iba cez nu
-			jD['c_ladderNextPriceLevel'] = price * (1 + jD['a_sensitivityForMinimalPriceChange'] + jD['a_maxLoss'])
+			oldNextPriceLevel_moved = price * (1 + jD['a_sensitivityForMinimalPriceChange'] + jD['a_maxLoss'])
+			jD['c_ladderNextPriceLevel'] = oldNextPriceLevel_moved + ((jD['c_ladderNextPriceLevel'] - oldNextPriceLevel_moved ) / 2)
 			jD['c_ladderBottomBoundary'] = price
 			return jD
-		# ked je to opakovany init, tak vstupujem aj cez spodnu hranicu, hornu hranicu nemenim (pri vymaze entry by mala byt nastavena spodna hranica na sumu znizenu o celkove percento ktore som prerobil )
+		# ked je to opakovany init, tak vstupujem aj cez spodnu hranicu, hornu hranicu nemenim 
+		# TODO (neskor ponechaj ako vysvetlivku) (pri vymaze entry by mala byt nastavena spodna hranica na sumu znizenu o celkove percento ktore som prerobil )
+		# TODO i ked je to len najnizsia suma, neskor by si mohol vymysliet nieco viac sofistikovane pre pripad extremneho padu marketu
 		elif(jD['c_ladderHighestReachedStep'] == -1):
-			return createMarketOrderForNewLadderEntry( client, jD )
+			return createMarketOrderForNewLadderEntry( client, jD, price )
 		
 	############## KONIEC SPAWNERA ##############
 	
@@ -174,10 +176,11 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 	list_uTs_sortAsc = jD['c_uTs_sortAsc']
 	list_lTs_sortDesc = jD['c_lTs_sortDesc']
 	
-	# todo dpln argumenty ked budes mat hotove jednotlive fcie
+	# todo dopln argumenty ked budes mat hotove jednotlive fcie - alebo posli cely jD
 	for i in range(len(list_uTs_sortAsc)):
-		if (price > list_uTs_sortAsc.get(E_UPPER_TRESHOLD, i_OUTOFRANGE)):
-			stepDic = jD['entries'][list_uTs_sortAsc[i]['step']]
+		if (price > list_uTs_sortAsc[i][E_UPPER_TRESHOLD]):
+			ladderStep = list_uTs_sortAsc[i]['step']
+			stepDic = jD['entries'].get(ladderStep, {E_ENTRY_TYPE: None})
 			if (stepDic[E_ENTRY_TYPE]==LIMIT_BUY):
 				r = uTlimitBuy(stepDic, price, jD['a_maxSlippage'])
 				if not (r is None):
@@ -190,12 +193,15 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 				r = uTwaitToSell(stepDic, price)
 				if not (r is None):
 					tmp[ladderStep] = r
+			# TODO dorob warning e je nezrovnalost v ladderStepoch - aj do lT loopu to dorob
+			# elif (stepDic[E_ENTRY_TYPE]==None):
 		else:
 			break
 			
 	for j in range(len(list_lTs_sortDesc)):
-		if (price < list_lTs_sortDesc[j].get(E_LOWER_TRESHOLD, 0)):
-			stepDic = jD['entries'][list_lTs_sortDesc[j]['step']]
+		if (price < list_lTs_sortDesc[j][E_LOWER_TRESHOLD]):
+			ladderStep = list_lTs_sortDesc[j]['step']
+			stepDic = jD['entries'].get(ladderStep, {E_ENTRY_TYPE: None})
 			if (stepDic[E_ENTRY_TYPE]==LIMIT_BUY):
 				r = lTlimitBuy(stepDic, price)
 				if not (r is None):
@@ -334,6 +340,7 @@ def uTwaitToSell(stepDic, currPrice):
 # to treba overit a rozhodnut kory bude init oreder ci limitBuy alebo waitToBuy
 def lTlimitBuy(stepDic, currPrice):
 	# - je to climax, po ktoreho prekroceni vyratas novu hodnotu limit orderu
+	# TODO to stym init orderom uz nepotrebujem ASI
 	# - pri init orderi to budem brat tiez ako climax, tj ked podlezeny, tak vypoctam novu hodnotu za ktoru by som chcel kupit
 	# pre int order mala byt tato hodnota nastavena ako cena za ktoru som chcel kupit minus 2 nasobok sensitivity
 	# opatrenie ked pri init orderi lastExchangePrice_avg = None
@@ -450,22 +457,43 @@ def resetOrdersAfterChangesInLadder(jD):
 	# vracia finalny jD dictionary
 	return templD
 	
+def getAmountForSpecificStep(amountsDic, stepNo):
+	highestAppliableStep_helper = i_OUTOFRANGE
+	highestAmount = 0
+	result = 0
 	
-def createMarketOrderForNewLadderEntry( client, jD ):
-	# TODO dories Qty cez validator a u_singleEntryAmounts
-	# POZOR musis konvertovat qoute amount do base amount (napr: BTC -> USDT)
-	currQty = 0.0 
-	marketOrderStats = client.order_market_buy(jD['a_tradedSymbol'], quantity=currQty)
+	for stepLimit, amount in amountsDic.items():
+		if( highestAmount < amount):
+			highestAmount = amount
+		if ( (stepNo <= int(stepLimit)) and (int(stepLimit) < highestAppliableStep_helper) ):
+			result = amount
+			highestAppliableStep_helper = int(stepLimit)
+	
+	if (result == 0):
+		result = highestAmount
+	
+	return result		
+
+def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
+	ladderHighestReachedStep = jD['c_ladderHighestReachedStep'] + 1
+	# correction because of the possible value -1 in c_ladderHighestReachedStep
+	if ( ladderHighestReachedStep < 1):
+		ladderHighestReachedStep = 1
+	jD['c_ladderHighestReachedStep'] = ladderHighestReachedStep	
+	
+	# get Qty - step 1 (get USDT amount from u_singleEntryAmounts)
+	calcQty = getAmountForSpecificStep(jD['u_singleEntryAmounts'], ladderHighestReachedStep)
+	# get Qty - step 2 (convert the USDT to coin amount based on the price from the ticker)
+	calcQty = calcQty / priceFromTicker
+	# get Qty - step 3 (run the calculated Qty throught the Qty validator)
+	calcQty = traderFunctions.validQty(jD['u_PriceQtyReqs'], priceFromTicker, calcQty)
+	
+	marketOrderStats = client.order_market_buy(jD['a_tradedSymbol'], quantity=calcQty)
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
 		fillQty = float(marketOrderStats[EXEC_QTY])
 		fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 		# update dics
 		jD['c_ladderNextPriceLevel'] = fillPrice * (1.0 + jD['a_sensitivityForMinimalPriceChange'])
-		ladderHighestReachedStep = jD['c_ladderHighestReachedStep'] + 1
-		# correction because of the possible value -1 in c_ladderHighestReachedStep
-		if ( ladderHighestReachedStep < 1):
-			ladderHighestReachedStep = 1
-		jD['c_ladderHighestReachedStep'] = ladderHighestReachedStep
 		jD['entries'][str(ladderHighestReachedStep)] = {E_ENTRY_TYPE: WAIT_TO_SELL,
 														E_ORDER_QTY: fillQty,
 														E_LAST_EXCHANGE_PRICE: fillPrice,
@@ -474,7 +502,7 @@ def createMarketOrderForNewLadderEntry( client, jD ):
 													}
 	else:
 		# TODO log error, zapis cely marketOrderStats, lebo ten response by mal byt filled (testoval som to)
-		pass
+		return None
 
 	return jD
 	

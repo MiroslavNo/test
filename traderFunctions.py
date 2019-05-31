@@ -474,11 +474,11 @@ def validQty(reqDic, desiredPrice, desiredQty, minNotionalSafeCoef = 1.03):
 	
 	if (desiredQtyDec < minQty):
 		desiredQtyDec = minQty
-		return float(desiredQtyDec)
+		return desiredQtyDec
 	if not ( ( desiredQtyDec - minQty ) % stepSize == 0 ):
 		desiredQtyDec = ( round( ( desiredQtyDec - minQty ) / stepSize ) * stepSize ) + minQty 
 	
-	return float(desiredQtyDec)
+	return desiredQtyDec
 
 
 def validPriceAndQty(reqDic, symbol, desiredPrice, desiredQty):
