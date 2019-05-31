@@ -2,7 +2,6 @@
 #******	 EVERY STRATEGY HAS TO HAVE		******#
 #*********************************************#
 import traderFunctions
-import strategyFunctions
 import traceback
 
 # prefix "a_" stands for mandatory variables
@@ -182,19 +181,21 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			ladderStep = list_uTs_sortAsc[i]['step']
 			stepDic = jD['entries'].get(ladderStep, {E_ENTRY_TYPE: None})
 			if (stepDic[E_ENTRY_TYPE]==LIMIT_BUY):
-				r = uTlimitBuy(stepDic, price, jD['a_maxSlippage'])
+				r = uTlimitBuy(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
 			elif (stepDic[E_ENTRY_TYPE]==LIMIT_SELL):
-				r = uTlimitSell(stepDic, price)
+				r = uTlimitSell(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
 			elif (stepDic[E_ENTRY_TYPE]==WAIT_TO_SELL):
-				r = uTwaitToSell(stepDic, price)
+				r = uTwaitToSell(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
-			# TODO dorob warning e je nezrovnalost v ladderStepoch - aj do lT loopu to dorob
-			# elif (stepDic[E_ENTRY_TYPE]==None):
+			elif (stepDic[E_ENTRY_TYPE] is None):
+				traderFunctions.ploggerErr(__name__ + ' / ' + jD['a_tradedSymbol'] +  ' - ' + ' the ladderStep Nr. ' + ladderStep + ' from list_uTs_sortAsc could not be found in the jD[entries] dictionary - there must be a discrepancy in the data!')
+			else:
+				traderFunctions.ploggerErr(__name__ + ' / ' + jD['a_tradedSymbol'] +  ' - ' + ' for the ladderStep Nr. ' + ladderStep + ' was an unexpected ' + E_ENTRY_TYPE + ' found: "' + stepDic[E_ENTRY_TYPE] + '" - this was not expecpected!')
 		else:
 			break
 			
@@ -203,27 +204,31 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			ladderStep = list_lTs_sortDesc[j]['step']
 			stepDic = jD['entries'].get(ladderStep, {E_ENTRY_TYPE: None})
 			if (stepDic[E_ENTRY_TYPE]==LIMIT_BUY):
-				r = lTlimitBuy(stepDic, price)
+				r = lTlimitBuy(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
 			elif (stepDic[E_ENTRY_TYPE]==LIMIT_SELL):
-				r = lTlimitSell(stepDic, price, jD['a_maxSlippage'])
+				r = lTlimitSell(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
 			elif (stepDic[E_ENTRY_TYPE]==WAIT_TO_BUY):
-				r = lTwaitToBuy(stepDic, price)
+				r = lTwaitToBuy(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
 			elif (stepDic[E_ENTRY_TYPE]==WAIT_TO_SELL):
-				r = lTwaitToSell(stepDic, price, jD['a_maxSlippage'])
+				r = lTwaitToSell(price, stepDic, jD)
 				if not (r is None):
 					tmp[ladderStep] = r
+			elif (stepDic[E_ENTRY_TYPE] is None):
+				traderFunctions.ploggerErr(__name__ + ' / ' + jD['a_tradedSymbol'] +  ' - ' + ' the ladderStep Nr. ' + ladderStep + ' from list_lTs_sortDesc could not be found in the jD[entries] dictionary - there must be a discrepancy in the data!')
+			else:
+				traderFunctions.ploggerErr(__name__ + ' / ' + jD['a_tradedSymbol'] +  ' - ' + ' for the ladderStep Nr. ' + ladderStep + ' was an unexpected ' + E_ENTRY_TYPE + ' found: "' + stepDic[E_ENTRY_TYPE] + '" - this was not expecpected!')
 		else:
 			break
 
 	
 	if bool(tmp):
-		# reset orders
+		# tuto nieco este chyba okrem reset orders, okrem toho by si to mal robitiba ked treba, tj. nie ked sa updateovali iba limity
 		jD['entries'].update(tmp)
 		return resetOrdersAfterChangesInLadder(jD)
 	else:
@@ -244,16 +249,15 @@ def uTlimitBuy(client, tradedSymbol, stepDic, currPrice, maxSlippage, maxLoss, s
 	if(orderId is None):
 		# ak nebol vytoreny ORDER, lebo napr TRADER nebezal - kedze je cena vyssia mal by si kupit?
 		cf = True
-		# todo log co sa stalo
-		# mohol by som tu este rozlisovat medzi tym ci presiel cez maxSlippage, ale to by bolo velmi narocne na logiku s listom kde mas zoradel upper tresholds, kedze tento je uz cez
+		traderFunctions.ploggerWarn(__name__ + ' / ' + tradedSymbol +  ' - ' + ' unexpected situation, the uT has been crossed for a ' + LIMIT_BUY +' entry, but no orderId was found -> going to create an market order', False)
+		# TODO_future mohol by som tu este rozlisovat medzi tym ci presiel cez maxSlippage, ale to by bolo velmi narocne na logiku s listom kde mas zoradel upper tresholds, kedze tento je uz cez
 		
 		marketOrderStats = client.order_market_buy(tradedSymbol, quantity=float(stepDic[E_ORDER_QTY]))
 		if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
 			fillQty = float(marketOrderStats[EXEC_QTY])
 			fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 		else:
-			# TODO log error, zapis cely marketOrderStats, lebo ten response by mal byt filled (testoval som to)
-			pass
+			traderFunctions.ploggerErr(__name__ + ' / ' + 'TODO dopln SEM a_tradedSymbol - neni jD zatial' +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 	else:	
 		orderStats = client.get_order(tradedSymbol, orderId)
 		
@@ -280,8 +284,7 @@ def uTlimitBuy(client, tradedSymbol, stepDic, currPrice, maxSlippage, maxLoss, s
 					# nove fillQty musi byt vypocitane az ako posledne, ekdze pouzivas povodnu hodnotu na predoslom riadku
 					fillQty = fillQty_market + fillQty
 				else:
-					# TODO log error, zapis cely marketOrderStats, lebo ten response by mal byt filled (testoval som to)
-					pass
+					traderFunctions.ploggerErr(__name__ + ' / ' + 'TODO dopln SEM a_tradedSymbol - neni jD zatial' +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 			else:
 				# the order got slipped all away
 				marketOrderStats = client.order_market_buy(tradedSymbol, quantity=float(stepDic[E_ORDER_QTY]))
@@ -289,8 +292,7 @@ def uTlimitBuy(client, tradedSymbol, stepDic, currPrice, maxSlippage, maxLoss, s
 					fillQty = float(marketOrderStats[EXEC_QTY])
 					fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 				else:
-					# TODO log error, zapis cely marketOrderStats, lebo ten response by mal byt filled (testoval som to)
-					pass
+					traderFunctions.ploggerErr(__name__ + ' / ' + 'TODO dopln SEM a_tradedSymbol - neni jD zatial' +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 				
 			# cancel the previous orderID (or the rest of it)
 			client.cancel_order(tradedSymbol, orderId))
@@ -314,14 +316,14 @@ def uTlimitSell(stepDic, currPrice):
 	# toto je hodnota climaxu, ked je prekrocena, tak prepocitas cenu za ktoru chces predat'
 	stepDic[E_UPPER_TRESHOLD] = float(currPrice)
 	# zaokruhlenie podla pravidiel na minPrice atd je potom ked vytvaras order, aby si optimalizoval pocetnost
-	stepDic[E_LOWER_TRESHOLD] = strategyFunctions.calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_SELL)
+	stepDic[E_LOWER_TRESHOLD] = calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_SELL)
 	return stepDic
 
-# DONE, jedine ze by si to mohol pouzit na inti order, treba este rozhodnut
+# DONE
 def uTwaitToBuy(stepDic, currPrice):
-	# nerobis minusovy obchod v tomto smere (defCoin to Coin), to znamena, ze ta nezaujima upperTreshold ked cakas an kupu, jedina moznost na ozivenie je ked cena klesne pod exchangePrice minus sensitivity
+	# nerobis minusovy obchod v tomto smere (defCoin to Coin), to znamena, ze ta nezaujima upperTreshold ked cakas na kupu, jedina moznost na ozivenie je ked cena klesne pod exchangePrice minus sensitivity
 	# tato funkcia NIE JE VOLANA, je tu iba ako POZNAMKA
-	# todo, mohol by si v buducnosti spravi nejake pocitadlo, na tento pripade (mimo sensitivity area), aby si vedel kolko dead orderov mas
+	# TODO_future, mohol by si v buducnosti spravi nejake pocitadlo, na tento pripade (mimo sensitivity area), aby si vedel kolko dead orderov mas
 	return None
 
 
@@ -332,7 +334,7 @@ def uTwaitToSell(stepDic, currPrice):
 	# nove lT, uT
 	stepDic[E_UPPER_TRESHOLD] = currPrice
 	# uT, bude polovica medzi tym co si predal a terajsou cenou
-	stepDic[E_LOWER_TRESHOLD] = strategyFunctions.calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_SELL)
+	stepDic[E_LOWER_TRESHOLD] = calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_SELL)
 	
 	return stepDic
 
@@ -351,14 +353,14 @@ def lTlimitBuy(stepDic, currPrice):
 		
 	stepDic[E_LOWER_TRESHOLD] = float(currPrice)
 	# zaokruhlenie podla pravidiel na minPrice atd je potom ked vytvaras order, aby si optimalizoval pocetnost
-	stepDic[E_UPPER_TRESHOLD] = strategyFunctions.calculateExchangePrice(float(lastExchangePrice_avg), currPrice, LIMIT_BUY)
+	stepDic[E_UPPER_TRESHOLD] = calculateExchangePrice(float(lastExchangePrice_avg), currPrice, LIMIT_BUY)
 	
 	return stepDic
 	
 def lTlimitSell(stepDic, currPrice, maxSlippage):
 	# hodnota, za ktoru si chcel predat, ked prekrocena pozeras ci sa naplnil sell order - ak ano vytvoris waitToBuy. Potom pozeras, ci sa neprekrocil maxSlippage, ak ano vytvoris marketSell a hned waitToBuy
 	# TODO ak sa prekrocil maxSlippage, tak pozri aj ci nepredavas so stratou, lebo ak ano, tak musis nastavit inak lT a uT
-	if(strategyFunctions.isOrderIdFilled(stepDic[E_ORDER_ID]))
+	if(getUnfilledAmount(stepDic.get(E_ORDER_ID, None)) == 0):
 		# update stepDic
 	
 	elif(currPrice < (float(stepDic[E_LOWER_TRESHOLD]) * (1 - maxSlippage)))
@@ -384,7 +386,7 @@ def lTwaitToBuy(stepDic, currPrice):
 	# nove lT, uT
 	stepDic[E_LOWER_TRESHOLD] = currPrice
 	# uT, bude polovica medzi tym co si predal a terajsou cenou
-	stepDic[E_UPPER_TRESHOLD] = strategyFunctions.calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_BUY)
+	stepDic[E_UPPER_TRESHOLD] = calculateExchangePrice(float(stepDic[E_LAST_EXCHANGE_PRICE]), currPrice, LIMIT_BUY)
 	
 	return stepDic
 
@@ -394,7 +396,7 @@ def lTwaitToSell(stepDic, currPrice, maxSlippage, tradedSymbol):
 	# hodnota avgExchangePrice minus maxLoss - tu bol dany limit sell na stratu - aspon by mal byt ak vydalo)
 	# pozres ci sa order naplnil (ak by nebol k tomuto bodu vytvoreny ziadny order, tak v dic je hodnota 0)
 	# ak nie, pozres ci sa neprekrocil maxSlippage, ak ano das market order
-	if(strategyFunctions.isOrderIdFilled(stepDic[E_ORDER_ID])):
+	if(getUnfilledAmount(stepDic.get(E_ORDER_ID, None)) == 0):
 		# TODO check and update the var cumullativeLosses
 		# cumullativeLosses = stepDic[E_CUMUL_LOSSES] + stepDic[E_LAST_EXCHANGE_PRICE] - 
 		# if ( cumullativeLosses > ( 2 * maxLoss ) ):
@@ -411,12 +413,12 @@ def lTwaitToSell(stepDic, currPrice, maxSlippage, tradedSymbol):
 		# todo quantity musi potom vzdy prejst skuskou na validitu
 		if (stepDic[E_ORDER_ID] is not None):
 			client.cancel_order( symbol=tradedSymbol, orderId=stepDic[E_ORDER_ID])
-			qtyMarketOrder = traderFunctions.unfilledAmountFrom(stepDic[E_ORDER_ID])
+			qtyMarketOrder = getUnfilledAmount(stepDic[E_ORDER_ID])
 		else:
 			qtyMarketOrder = 
 		
 		
-			marketOrderStats = client.order_market_sell(tradedSymbol, quantity=float(traderFunctions.unfilledAmountFrom(stepDic[E_ORDER_ID])))
+			marketOrderStats = client.order_market_sell(tradedSymbol, quantity=float(getUnfilledAmount(stepDic[E_ORDER_ID])))
 			if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
 				fillQty = float(marketOrderStats[EXEC_QTY])
 				fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
@@ -429,34 +431,7 @@ def lTwaitToSell(stepDic, currPrice, maxSlippage, tradedSymbol):
 		stepDic[E_ENTRY_TYPE] = WAIT_TO_BUY
 	
 	return stepDic
-	
-def updateSortedListsOfTresholds(dic):
-	# TODO neveim ci tuto enbum musiet filtrovat an spravny typ entry, kedze napr pri limitBuy ked podlieza lt, tak je to iba novy climax a tym padom netreba robit stopLimitOrder
-	entries = dic.get('entries', None)
-	if (entries is None):
-		# TODO log err
-		return dic
-	
-	list_to_be_sorted = list(())
-	for ladderStep, ladderStepDic in entries.items():
-		list_to_be_sorted.extend({ladderStep, ladderStepDic[E_LOWER_TRESHOLD], ladderStepDic[E_UPPER_TRESHOLD]})
-	
-	lTSortedList = sorted(list_to_be_sorted, key=lambda k: k[E_LOWER_TRESHOLD], reverse=True)
-	uTSortedList = sorted(list_to_be_sorted, key=lambda k: k[E_UPPER_TRESHOLD])
-	
-	dic.update({'c_uTs_sortAsc': uTSortedList,	'c_lTs_sortDesc': lTSortedList})
-	return dic
-	
-def resetOrdersAfterChangesInLadder(jD):
-	
-	jD = updateSortedListsOfTresholds(jD)
-	
-	# TODO ked budes vytvarat order, tak to musis zaokruhlit podla binance pravidiel pre cenu a mnozsvor
-	templD = {}
-	
-	# vracia finalny jD dictionary
-	return templD
-	
+
 def getAmountForSpecificStep(amountsDic, stepNo):
 	highestAppliableStep_helper = i_OUTOFRANGE
 	highestAmount = 0
@@ -501,14 +476,42 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 														E_LOWER_TRESHOLD: fillPrice * (1.0 - jD['a_maxLoss'])
 													}
 	else:
-		# TODO log error, zapis cely marketOrderStats, lebo ten response by mal byt filled (testoval som to)
+		traderFunctions.ploggerErr(__name__ + ' / ' + jD['a_tradedSymbol'] +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 		return None
 
 	return jD
-	
-def mergeAndDeleteEntries(jD):
-	pass
 
+
+
+	
+def updateSortedListsOfTresholds(dic):
+	# TODO neveim ci tuto nebudem musiet filtrovat an spravny typ entry, kedze napr pri limitBuy ked podlieza lt, tak je to iba novy climax a tym padom netreba robit stopLimitOrder
+	entries = dic.get('entries', None)
+	if (entries is None):
+		# TODO dopln ktory symbol a ktory client
+		# TODO neviem co sa ma robit ak je dic prazdny
+		traderFunctions.ploggerErr(__name__ + ' no dictionary for entries found')
+		return dic
+	
+	list_to_be_sorted = list(())
+	for ladderStep, ladderStepDic in entries.items():
+		list_to_be_sorted.extend({ladderStep, ladderStepDic[E_LOWER_TRESHOLD], ladderStepDic[E_UPPER_TRESHOLD]})
+	
+	lTSortedList = sorted(list_to_be_sorted, key=lambda k: k[E_LOWER_TRESHOLD], reverse=True)
+	uTSortedList = sorted(list_to_be_sorted, key=lambda k: k[E_UPPER_TRESHOLD])
+	
+	dic.update({'c_uTs_sortAsc': uTSortedList,	'c_lTs_sortDesc': lTSortedList})
+	return dic
+	
+def resetOrdersAfterChangesInLadder(jD):
+	
+	jD = updateSortedListsOfTresholds(jD)
+	
+	# TODO ked budes vytvarat order, tak to musis zaokruhlit podla binance pravidiel pre cenu a mnozsvor
+	templD = {}
+	
+	# vracia finalny jD dictionary
+	return templD
 
 
 
@@ -518,3 +521,50 @@ def mergeAndDeleteEntries(jD):
 #except Exception:
 #	if(traceback.format_exc()[-55:-1] == API_ERR_TOO_LATE):
 #		# here comes a market order, as it was too late
+
+
+
+# TODO toto az v buducnu, lebo by som chcel vidiet ako spravaju jednotlive entries a okrem toho to nie je MVP
+def mergeAndDeleteEntries(jD):
+	pass
+
+
+# returns the amount which wasnt filled
+def getUnfilledAmount(orderID):
+	if( (orderID is None) or (orderID == 0) ):
+		return None
+	
+
+
+def calculateExchangePrice(lastExchangePrice_avg, newPriceClimax, desiredDirection, startingTargetRatio=0.5, maxTargetRatio=0.8):
+	# startingTargetRatio = inicialna hodnota pomeru s ktorym zacne pocitat ked dosiahne minimalny posun v cene
+	# maxTargetRatio = maximal target ratio value
+	
+	if (desiredDirection == LIMIT_BUY):
+		if (lastExchangePrice_avg > newPriceClimax):
+			#((3000 - 2000) / 2000) / 2 + 0,5
+			newTargetRatio = ((lastExchangePrice_avg - newPriceClimax) / newPriceClimax) / 2 + startingTargetRatio
+		else:
+			newTargetRatio = startingTargetRatio
+			# we are on the wrong side - using 1.004 as the half of it is 0.2 % and that is the minimum trade diff which is making profit
+			#TODO tuto over co to sposobuje, sice by sa to sme nemalo dostat
+			newPriceClimax = lastExchangePrice_avg * 1.004
+		if (newTargetRatio > maxTargetRatio):
+			newTargetRatio = maxTargetRatio
+		print('am here, values are: lastExchangePrice_avg=' + str(lastExchangePrice_avg) + ' newPriceClimax=' + str(newPriceClimax) + 'newTargetRatio=' + str(newTargetRatio))
+		newTargetPrice = lastExchangePrice_avg - ((lastExchangePrice_avg - newPriceClimax) * newTargetRatio)
+		
+	if (desiredDirection == LIMIT_SELL):
+		if (lastExchangePrice_avg < newPriceClimax):
+			# ((4000 - 3000) / 3000) / 2 + 0,5
+			newTargetRatio = ((newPriceClimax - lastExchangePrice_avg) / lastExchangePrice_avg) / 2 + startingTargetRatio
+		else:
+			newTargetRatio = startingTargetRatio
+			# we are on the wrong side - using 0.996 as the half of it is 0.2 % and that is the minimum trade diff which is making profit
+			#TODO tuto over co to sposobuje, sice by sa to sme nemalo dostat
+			newPriceClimax = lastExchangePrice_avg * 0.996
+		if (newTargetRatio > maxTargetRatio):
+			newTargetRatio = maxTargetRatio
+		newTargetPrice = ((newPriceClimax - lastExchangePrice_avg) * newTargetRatio) + lastExchangePrice_avg
+	
+	return newTargetPrice

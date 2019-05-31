@@ -5,7 +5,6 @@ import json
 import sys, os
 from decimal import Decimal
 
-
 ######################################################
 #############		LOGGING				##############
 ######################################################
@@ -15,16 +14,24 @@ errorLogger = logging.getLogger('errorLogger')
 sharedPrefFileLastEmail = 'emailNotification_lastWarningEmailTime'
 
 def startLoggers():
+	from pathlib import Path
 	global infoLogger
 	global errorLogger
 	
+	# rolling infoLogger sa vyriesil tak, ze pri kazdom starte sa stary subor premenuje s time stamp-om ak vacsi nez 7,5 Mb
+	pathInfoLogger = Path(getScriptLocationPath(1) + r'\ReportsAndLogs\traderLog.log')
+	if pathInfoLogger.is_file():
+		if(os.path.getsize(pathInfoLogger) > 7500000):
+			pathInfoLogger.rename(Path(getScriptLocationPath(1) + r'\ReportsAndLogs\traderLog_' + str(datetime.datetime.now().strftime("%Y%d%m_%H%M")) + '.log'))
+	
 	formatter = logging.Formatter('%(asctime)s - %(message)s')
 
-	infohandler = logging.FileHandler( getScriptLocationPath(1) + r'\ReportsAndLogs\traderLog.log')
+	infohandler = logging.FileHandler( pathInfoLogger )
 	infohandler.setFormatter(formatter)
 	infoLogger.setLevel(logging.INFO)
 	infoLogger.addHandler(infohandler)
 
+	# errorLogger sa nerolluje, ale vymazava manualne, aby som vzdy videl ake errory su tam, okrem toho vsetky tieto udaje su aj v infologgerovi
 	errorHandler = logging.FileHandler( getScriptLocationPath(1) + r'\ReportsAndLogs\traderLogErr.log')
 	errorHandler.setFormatter(formatter)
 	errorLogger.setLevel(logging.INFO)
@@ -52,7 +59,6 @@ def ploggerErr(msg):
 	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 		send_email('TRADER - Logger ERR', msg)
 		writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
-	# todo - dopln mozno nejaku zvukovu signalizaciu, video o pipa alebo take nieco
 
 #################		GET CLIENTS		#################
 # @Tested
