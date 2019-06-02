@@ -75,7 +75,7 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 	lastPrice = traderFunctions.getLastPrice(client, BNB, USDT)
 	desiredAmountOfBNB_inBNB = round(desiredAmountOfBNB_inUSDT / lastPrice, 2)
 	# TODO tuto v buducnosti daj len to mnozstvo, ktore nie je dokumentovane v jsone pre BNBUSDT market
-	currentAmountOfBNB_inBNB = getAvailableAmount(client, BNB, roundDigits=2)
+	currentAmountOfBNB_inBNB = traderFunctions.getAvailableAmount(client, BNB, roundDigits=2)
 	
 	if(currentAmountOfBNB_inBNB > desiredAmountOfBNB_inBNB):
 		traderFunctions.ploggerInfo('ensureBNBforFees - there is enough BNB ( currentAmountOfBNB_inBNB=' + str(currentAmountOfBNB_inBNB) + ', desiredAmountOfBNB_inBNB=' + str(desiredAmountOfBNB_inBNB)) 
@@ -85,7 +85,7 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 		calcQty_inBNB = 3 * (desiredAmountOfBNB_inBNB - currentAmountOfBNB_inBNB)
 		# check if enough USDT for buying BNB (safety coef of 1.1)
 		if not (traderFunctions.hasAvailableAmount(client, USDT, (1.1 * calcQty_inBNB * lastPrice))):
-			traderFunctions.ploggerWarn('There is not enough USDT for buying BNB for fees. Free USDT=' + str(traderFunctions.getAvailableAmount(client, USDT, roundDigits=0)) + ' / USDT required to buy BNB=' + str(1.1 * calcQty_inBNB * lastPrice), False)
+			traderFunctions.ploggerWarn('There is not enough USDT for buying BNB for fees. Free USDT=' + str(traderFunctions.traderFunctions.getAvailableAmount(client, USDT, roundDigits=0)) + ' / USDT required to buy BNB=' + str(1.1 * calcQty_inBNB * lastPrice), False)
 		else:
 			# get valid amount
 			calcQty_inBNB = traderFunctions.validQty(traderFunctions.getPriceAndQtyReqs(BNBUSDT, client), lastPrice, calcQty_inBNB)

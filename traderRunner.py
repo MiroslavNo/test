@@ -238,10 +238,10 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 	# HLAVNA METODA KAZDEJ STRATGIE = trade():
 	# MANDATORY INIT VARS = mandatoryInitVars
 
-# TODO v buducnu daj viac genericku fciu, kde budes vediet adavat nazvy strategii pre filtre, alebo ako tuto pouzi defaultnu hodnotu ktora updatene setky jsony
 traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['mno'], 'u_PriceQtyReqs')
+# TODO v buducnu daj viac genericku fciu, kde budes vediet davat nazvy strategii ako filter, lebo pri inych strategiach by tieto hodnoty boli nechcene. A takisto filter pre clientov, lebo na kazdom ucte su ine sumy a to ma tiez vplyv v urcitych pripadoch
 # VERY DIRTY
-traderFunctions.updateSingleEntryAmounts(clients['mno'], 'u_singleEntryAmounts', {"3": 15,"6": 21,"9": 29,"12": 41, "15": 58,"18": 81, "21": 113,"24": 158, "27": 221, "30": 310,"33": 434,"36": 607}, 'pumpTheRightCoin')
+traderFunctions.updateJsonTriggerFiles('u_singleEntryAmounts', )
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)

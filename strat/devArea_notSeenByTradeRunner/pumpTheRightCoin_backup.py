@@ -16,43 +16,7 @@ mandatoryInitVars = {
 	"a_sensitivity": "float - percentualna hodnota v absolutnom cisle, ktora musi byt prekrocena, aby po zmene pozicie zacal uvazovat nad tym, ze zmeni poziciu zas (hodnota hovori ze sme dosiahli prvy climax od zmeny pozicie) - POUZIVAS AJ AKO PERCENTUALNU HODNOTU PRE DALSI STUPEN LADDERU. Hodnota ma tvar 0.005",
 	"a_maxLoss": "float - percentualna hodnota v absolutnom cisle, ktora ked je dosiahnuta, tak sa rozhodne prejst na druhu stranu napriek tomu ze je v strate - pouziva sa iba v smere coin to defCoin",
 	"a_cumulLoss_limit": "float - !! NEGATIVNA !! percentualna hodnota v absolutnom cisle (napr. -0.03), ktora ked je prekrocena, pri lTwaitToSell, tak vymaze entry - je to myslene ako maximalny loss na entry, a tento sa statva len ked je prekroceny lT v statuse wait to sell"
-	"u_singleEntryAmounts": {
-		"descr": "int - Qtity for buy in USDT (!!POZOR!! musis konvertovat do base amountu, napr.BTC ked vytvaras entry)- berie pred startom zo singleEntryAmounts_client v sharedPrefs. POZN: nema zmysel uz tuto upravovat ceny podla poziadaviek binance na cenu a qty, lebo toto sa stava iba malo krat a ostatne treba vzdy overit"
-		"3": 33,
-		"6": 50,
-		"9": 75, 
-		"12": 113,
-		"15": 169,
-		"18": 254
-	},
-	"u_PriceQtyReqs": {
-		"descr": "str",
-		"minPrice": "minimal price - najnizsia mozna cena",
-		"tickSize": "minimalna zmena ceny (cela cena delitelna tymto cislom)"
-		"stepSize": "minimalna zmena volumu (cely volume delitelny tymto cislom)"
-		"minQty": "minimalny volume v kupovanom assete (pri BTCUSDT je to BTC)"
-		"minNotional": "minimalny volume v base assete (pri BTCUSDT je to USDT)"
-	},
-	"c_ladderNextPrice": "float - cena, ktora reprezentuje dalsi stupen na ladderi - pri starte noveho marketu sa nastavi na aktualnu cenu + krok",
-	"c_ladderHighestReachedStep": "int - nr. of steps which have been reached on the ladder. An init market has the value 0, a market where I entered but exited and deleted the entry has the value -1",
-	"c_ladderBottomBoundary": "float - cena, ktora je pouzita pre ucely startovania marketu, ked je podlezena, tak prepocitam c_ladderNextPrice - pouziva sa pri c_ladderHighestReachedStep = 0 alebo -1 (init alebo opakovany init) - pri starte marketu je nastavena na price - a_maxLoss",
-	"c_uTs_asc": "list of ascending sorted upper thresholds [{'uT':'102', 'step':2}, {'uT':'103', 'step':1}]",
-	"c_lTs_desc": "list of descending sorted lower thresholds [{'lT':'100', 'step':2}, {'uT':'99', 'step':1}]",
-	"entries": {
-		"#": "key to each entry is the ladder step int(!) c_ladderHighestReachedStep at the time of creation a new entry(json key can only be a string)"
-		"1": {
-			"typ": "vals: limitBuy(ked je vytvoreny buy order), limitSell(detto), waitToBuy (ked sa predalo, a cakam kedy klesne cena o sensibility value aby som mohol zas vytvorit limitBuyOrder), waitToSell(detto)",
-			"qty": "the volume which will be / is used in the order - THIS IS THE BASE QTY, so for example in BTCUSDT it is the amount of BTC",
-			"lastXchangePrice": "float - 121.22",
-			"uT": "float - stands for upperThreshold",
-			"lT": "float - stands for lowerThreshold",
-			"cumulLoss": "float - percentulna suma stratovych predajov, ktora ked prekroci 2*maxLoss, tak je entry vymazany z dict. Pri zarobkoch ide tato hodnota hore maximalne po 0.0"
-			},
-		"2": {
-			"detto"
-		}
 	}
-}
 
 #*********************************************#
 #******	 			CONSTANTS			******#
@@ -93,6 +57,15 @@ STATUS = 'status'
 EXEC_QTY = 'executedQty'
 CUMUL_QTY = 'cummulativeQuoteQty'
 
+# function names for the debug protocoll
+UT_LIMIT_BUY = 'uTlimitBuy' 
+UT_LIMIT_SELL = 'uTlimitSell'
+UT_WAITTO_SELL = 'uTwaitToSell'
+LT_LIMIT_BUY = 'lTlimitBuy'
+LT_LIMIT_SELL = 'lTlimitSell'
+LT_WAITTO_BUY = 'lTwaitToBuy'
+LT_WAITTO_SELL = 'lTwaitToSell'
+
 # OTHER CONSTANTS
 # cislo, ktore je prilis vysoke na to aby bolo dosiahnute, pouzivane pri UT pre waitToBuy
 i_OUTOFRANGE = 1000000
@@ -102,33 +75,9 @@ DEBUG = True
 
 
 def trade(client, key, jD, pricesFromTicker, backTest=False):
-	
-	#*********************************************#
-	#* 					NOTES					**#
-	#*********************************************#	
-	
+
 	# key stands for the name of the json
-	#
 	# jD stands for jsonDictionary
-	# prefix 'a_' stands for mandatory variables
-	# prefix 'c_' stands for computed variables
-	# prefix 'u_' stands for variables which are updated before the start of the script, for example minQty
-	# all variables from jD have a prefix (except 'strategy' and 'client') - these need to be !! updated !! in the jD
-	# !!! variables without prefix are NOT updated in the jD !!!
-	#
-	#
-	#
-	#
-	#
-	#
-	#
-	#
-	#
-	#
-	#
-	#*********************************************#
-	#*********************************************#
-	#*********************************************#
 
 	price = pricesFromTicker.get(jD[A_SYMBOL], 0)
 	if (price==0):
@@ -138,20 +87,6 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 	
 	# TODO_future skus prerobit na limit order s rezevervou (rozdielom medzi trigger a cena) - ten by vedel rychlejsie reagovat a mal by "poistku" ze nekupi prilis draho
 	# spawner comes as first!
-	
-	# TODO_future tento prvy if odsek v buducnu cast len startovacieho skriptu
-	ladderNextPriceLevel = jD.get(C_LADDER_NEXT_PRICE, 0.0)
-	# ked je 0.0 tak je to uplne novy init
-	if(ladderNextPriceLevel == 0.0):
-		traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' Totally new json, setting up vars for the ladder - this msg should happen only once for each market!')
-		jD[C_LADDER_NEXT_PRICE] = price * ( 1.0 + jD[A_SENSITIVITY] )
-		jD[C_LADDER_BOTTOM_BOUNDARY] = price * ( 1.0 - jD[A_MAX_LOSS] )
-		jD[C_LADDER_HIGHEST_REACHED_STEP] = 0
-		if DEBUG:
-			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' this is the whole jD:\n' + traderFunctions.formatDictForPrint(jD))
-		return jD
-	
-	# pouzivam jD[C_LADDER_NEXT_PRICE] namiesto ladderNextPriceLevel lebo to pojde v buducnu prec
 	if (price >= jD[C_LADDER_NEXT_PRICE]):
 		# 1A, ked sa dany market startuje, tak bol C_LADDER_NEXT_PRICE nastaveny na aktualnu cenu + krok. C_LADDER_HIGHEST_REACHED_STEP je nastaveny na 0, resp. na -1 ak som uz vstupil ale mi to nevyslo - musel byt entry vymazany
 		# 1B, ked je dany market uz nastartovany, tak pokracuje tak je to posledna (najvyssia) cena za ktoru som kupoval
@@ -166,7 +101,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			# ked je to cisto novy init, tak posuvam hornu hranicu (A_SENSITIVITY) dole a vstupujem iba cez nu
 			nextPriceLevel_moved = price * (1 + jD[A_SENSITIVITY] + jD[A_MAX_LOSS])
 			if DEBUG:
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=0, ak iba nastavujem novy C_LADDER_NEXT_PRICE a C_LADDER_BOTTOM_BOUNDARY')
+				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=0, ak iba nastavujem novy C_LADDER_NEXT_PRICE a C_LADDER_BOTTOM_BOUNDARY')
 			jD[C_LADDER_NEXT_PRICE] = nextPriceLevel_moved + ((jD[C_LADDER_NEXT_PRICE] - nextPriceLevel_moved ) / 2)
 			jD[C_LADDER_BOTTOM_BOUNDARY] = price
 			if DEBUG:
@@ -177,7 +112,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 		elif(jD[C_LADDER_HIGHEST_REACHED_STEP] == -1):
 			# POZN: skusal som radsej spravit jD update, ale kedze entries je nested, tak nevime update-nut aj nenestnute aj nestnute data v jednom kroku
 			if DEBUG:
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=-1, vytvorim novy init ladder order')
+				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=-1, vytvorim novy init ladder order')
 			return createMarketOrderForNewLadderEntry( client, jD, price )
 					
 	############## KONIEC SPAWNERA ##############
@@ -194,14 +129,20 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			strLadderStep = str(list_uTs_sortAsc[i][STEP_NR])
 			stepDic = jD[ENTRIES].get(strLadderStep, {E_TYP: None})
 			if (stepDic[E_TYP]==LIMIT_BUY):
+				if DEBUG:
+					protocollFcionRun(UT_LIMIT_BUY, strLadderStep)
 				r = uTlimitBuy(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL])
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==LIMIT_SELL):
+				if DEBUG:
+					protocollFcionRun(UT_LIMIT_SELL, strLadderStep)
 				r = uTlimitSell(price, stepDic)
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==WAIT_TO_SELL):
+				if DEBUG:
+					protocollFcionRun(UT_WAITTO_SELL, strLadderStep)
 				r = uTwaitToSell(price, stepDic)
 				if not (r is None):
 					tmp[strLadderStep] = r
@@ -217,18 +158,26 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			strLadderStep = str(list_lTs_sortDesc[j][STEP_NR])
 			stepDic = jD[ENTRIES].get(strLadderStep, {E_TYP: None})
 			if (stepDic[E_TYP]==LIMIT_BUY):
+				if DEBUG:
+					protocollFcionRun(LT_LIMIT_BUY, strLadderStep)
 				r = lTlimitBuy(price, stepDic)
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==LIMIT_SELL):
+				if DEBUG:
+					protocollFcionRun(LT_LIMIT_SELL, strLadderStep)
 				r = lTlimitSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL])
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==WAIT_TO_BUY):
+				if DEBUG:
+					protocollFcionRun(LT_WAITTO_BUY, strLadderStep)
 				r = lTwaitToBuy(price, stepDic)
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==WAIT_TO_SELL):
+				if DEBUG:
+					protocollFcionRun(LT_WAITTO_SELL, strLadderStep)
 				r = lTwaitToSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_CUMUL_LOSS_LIMIT])
 				if not (r is None):
 					# the above if condition means that something happend
@@ -263,7 +212,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 				jD[C_LADDER_HIGHEST_REACHED_STEP] = -1
 				# pri vymaze entry by mala byt nastavena spodna hranica na sumu znizenu o celkove percento ktore som prerobil
 				# POZOR E_CUMUL_LOSS je zaporna hodnota, preto tam je 1.0 +
-				jD[C_LADDER_BOTTOM_BOUNDARY] = price * ( 1.0 + (removedEntry.get(E_CUMUL_LOSS, (-2 * jD[A_MAX_LOSS])))
+				jD[C_LADDER_BOTTOM_BOUNDARY] = price * ( 1.0 + (removedEntry.get(E_CUMUL_LOSS, (-2 * jD[A_MAX_LOSS]))))
 				# jD[C_LADDER_NEXT_PRICE] ostava tak isto ako bolo, lebo ked som prerobil na tom useku, tak tamuz nebudem vstupovat skor
 		
 		if DEBUG:
@@ -277,8 +226,6 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 
 def uTlimitBuy(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol):
 	# cena za ktoru si chcel kupit - ak prekrocena, vytvoris market buy
-	if DEBUG:
-		protocollFcionRun('uTlimitBuy')
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
 	marketOrderStats = client.order_market_buy(symbol=tradedSymbol, quantity=calcQty)
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
@@ -314,8 +261,6 @@ def uTlimitBuy(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSy
 
 def uTlimitSell(currPrice, stepDic):
 	# toto je hodnota climaxu, ked je prekrocena, tak prepocitas cenu za ktoru chces predat'
-	if DEBUG:
-		protocollFcionRun('uTlimitSell')
 	stepDic[E_UPPER_TRESHOLD] = float(currPrice)
 	# zaokruhlenie podla pravidiel na minPrice atd je potom ked vytvaras order, aby si optimalizoval pocetnost
 	stepDic[E_LOWER_TRESHOLD] = calculateExchangePrice(float(stepDic[E_LAST_XCHANGE_PRICE]), currPrice, LIMIT_SELL)
@@ -330,8 +275,6 @@ def uTwaitToBuy(currPrice, stepDic):
 
 def uTwaitToSell(currPrice, stepDic):
 	# hodnota avgExchangePrice + sensitivity, bola prekrocena, takze vytvoris limitSell
-	if DEBUG:
-		protocollFcionRun('uTwaitToSell')
 	stepDic[E_TYP] = LIMIT_SELL
 	# nove lT, uT
 	stepDic[E_UPPER_TRESHOLD] = currPrice
@@ -343,8 +286,6 @@ def uTwaitToSell(currPrice, stepDic):
 
 def lTlimitBuy(currPrice, stepDic):
 	# - je to climax, po ktoreho prekroceni vyratas novu hodnotu limit orderu
-	if DEBUG:
-		protocollFcionRun('lTlimitBuy')
 	stepDic[E_LOWER_TRESHOLD] = float(currPrice)
 	# zaokruhlenie podla pravidiel na minPrice atd je potom ked vytvaras order, aby si optimalizoval pocetnost
 	stepDic[E_UPPER_TRESHOLD] = calculateExchangePrice(float(stepDic[E_LAST_XCHANGE_PRICE]), currPrice, LIMIT_BUY)
@@ -353,8 +294,6 @@ def lTlimitBuy(currPrice, stepDic):
 
 def lTlimitSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol):
 	# cena za ktoru si chcel predat - ak prekrocena, vytvoris market sell
-	if DEBUG:
-		protocollFcionRun('lTlimitSell')
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
 	marketOrderStats = client.order_market_sell(symbol=tradedSymbol, quantity=calcQty)
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
@@ -390,8 +329,6 @@ def lTlimitSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedS
 
 def lTwaitToBuy(currPrice, stepDic):
 	# hodnota avgExchangePrice minus sensitivity, ked je prekrocena, vytvoris limitBuy
-	if DEBUG:
-		protocollFcionRun('lTwaitToBuy')
 	stepDic[E_TYP] = LIMIT_BUY
 	# nove lT, uT
 	stepDic[E_LOWER_TRESHOLD] = currPrice
@@ -402,8 +339,6 @@ def lTwaitToBuy(currPrice, stepDic):
 
 def lTwaitToSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, cumulLossLimit):
 	# dosiahol si cenu ktora je ako keby taky stop loss po tom ako si vstupil do lTwaitToSell
-	if DEBUG:
-		protocollFcionRun('lTwaitToSell')
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
 	marketOrderStats = client.order_market_sell(symbol=tradedSymbol, quantity=calcQty)
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
@@ -435,8 +370,8 @@ def lTwaitToSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, traded
 			# calculate the uT and lT for the new waitToBuy entry
 			# upper treshold bude i_OUTOFRANGE kedze nikdy nechem aby som robil minusovy obchod
 			stepDic[E_UPPER_TRESHOLD] = i_OUTOFRANGE
-			# lower treshold bude avgExchangePrice minus sensitivity
-			stepDic[E_LOWER_TRESHOLD] = fillPrice * (1.0 - sensitivity)
+			# lower treshold by za normalnych okolnosti bol avgExchangePrice minus sensitivity, ale tu som sa rozhodol daj predchadzajucu stratu, ak je vacsia ako sensitivity
+			stepDic[E_LOWER_TRESHOLD] = fillPrice * (1.0 - max(sensitivity, abs(gain)))
 	else:
 		traderFunctions.ploggerErr(__name__ + ' / ' + tradedSymbol +  ' - ' + ' unexpected situation, the market order from uTlimitBuy had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 		return None
@@ -559,11 +494,55 @@ def calcGain(previousAvgXchange, currAvgXchange, direction ):
 		traderFunctions.ploggerErr(__name__ + ' - ' + 'Unexpected direction in the fction calcCumulLoss: ' + direction)
 		return 0
 
-def protocollFcionRun(fname):
+def protocollFcionRun(fname, strStepNr):
 	# for debug purposes
 	# can see which functions run, and the jD before and after (so the values as well) - this should be enough for investigation
-	traderFunctions.ploggerInfo(__name__ + ' / ' +  ' - ' + fname + ' called, whole jD will follow')
+	traderFunctions.ploggerInfo(__name__ + ' / ' +  ' - ' + fname + ' called for the stepNr ' + strStepNr +', whole jD will follow')
 	
+
+# without u_ vars - would require the client 
+# and without strategy and client var, those get filled on the stratup of the trade runner
+def startNewMarket(clientName, client, market, scriptLocationPath, currPrice=None):
+	"""
+		scriptLocationPath - is only the math to the script, not to the folder jsonTriggerFiles where the json will be stored - the dumpGlobalVariablesToJson takes care of that
+	"""
+	# zatial zakomentovane, lebo to pouzivam iba v "obmedzenom mode"
+	# traderFunctions.ploggerInfo(__name__ + ' - Starting a new market: ' + market)
+	
+	strategyName = __name__
+	sharedPrefFileName = "pumpTheRightCoin_mandatoryParams_marketSpecific.json"
+	
+	r = traderFunctions.getValFromSharedPrefFile(sharedPrefFileName, market)
+	if r is None:
+		# taking the default value
+		r = traderFunctions.getValFromSharedPrefFile(sharedPrefFileName, 'default')
+		if r is None:
+			ploggerErr(__name__ + ' - ' + ' nor the default or a specific params were found in the shared pref file: ' + sharedPrefFileName)
+			return None
+	
+	if currPrice is None:
+		currPrice = traderFunctions.getLastPrice(client, market)
+	
+	r[A_SYMBOL] = market
+	
+	r[C_LADDER_NEXT_PRICE] = currPrice * ( 1.0 + r[A_SENSITIVITY] )
+	r[C_LADDER_BOTTOM_BOUNDARY] = currPrice * ( 1.0 - r[A_MAX_LOSS] )
+	r[C_LADDER_HIGHEST_REACHED_STEP] = 0
+	
+	# get price reqs
+	r[U_PRICE_QTY_REQS] = (traderFunctions.getPriceAndQtyReqs(market, client))
+	# get single entry amounts
+	r[U_SINGLE_ENTRY_AMOUNTS] = (traderFunctions.getValFromSharedPrefFile(U_SINGLE_ENTRY_AMOUNTS + '_' + clientName + '.json', U_SINGLE_ENTRY_AMOUNTS))
+	
+	traderFunctions.dumpGlobalVariablesToJson('{}_{}_{}'.format(strategyName, market, clientName), r, scriptLocationPath)
+	
+	# tieto 2 davam az potom ako zapisal json, lebo tradeRunner funguje tak, ze si ich vzdy pri startupe precita z nazvu suboru
+	# kedze ale chces mat return an to, aby si vedel hned obchodovat, tak to v tomto dict potrebujes
+	r['strategy'] = strategyName
+	r['client'] = clientName
+	
+	return r
+
 
 # TODO_future, najprv by som chcel vidiet ako spravaju jednotlive entries a okrem toho to nie je MVP
 def mergeAndDeleteEntries(jD):

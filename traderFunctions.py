@@ -65,7 +65,9 @@ def ploggerWarn(msg, sendEmail=True):
 			writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
 
 def ploggerErr(msg):
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - Err - ' + msg)
+	# print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - Err - ' + msg)
+	# the msg should be printed automatically but a timestpamt would be nice
+	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")))
 	errorLogger.error('Err - ' + msg)
 	infoLogger.info('Err - ' + msg)
 	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
@@ -83,16 +85,15 @@ def ploggerTrades(symbol, stepNr, entryType, price, diffTriggPriceVsExecPrice, g
 	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - TRADE - ' + msg)
 
 def formatDictForPrint(d, tab=0):
-    s = ['{\n']
-    for k,v in d.items():
-        if isinstance(v, dict):
-            v = format(v, tab+1)
-        else:
-            v = repr(v)
-
-        s.append('%s%r: %s,\n' % ('  '*tab, k, v))
-    s.append('%s}' % ('  '*tab))
-    return ''.join(s)
+	if d is None:
+		return None
+	s = ['{\n']
+	for k,v in d.items():
+		if not isinstance(v, dict):
+			v = repr(v)
+		s.append('%s%r: %s,\n' % ('  '*tab, k, v))
+	s.append('%s}' % ('  '*tab))
+	return ''.join(s)
 
 #################		GET CLIENTS		#################
 # @Tested
@@ -174,7 +175,7 @@ def loadAllInitJsons(requiredInitialValuesDict):
 	return allJsonsDict
 	
 def dumpGlobalVariablesToJson(fileName, globalVariables, scriptLocationPath):
-	# scriptLocationPath je tu ako param a nie ako getScriptLocationPath(), lebo sa tato metoda sa moze casto pouzivat
+	# scriptLocationPath je tu ako param a nie ako getScriptLocationPath(), aby sa tato metoda nepouzivala casto
 	sharedPrefRootFolder = scriptLocationPath + r"\jsonTriggerFiles"
 	#ak ten file neexistuje, vytvori novy
 	with open(sharedPrefRootFolder + "\\" + fileName + ".json", mode='w') as sharedPrefFile:
@@ -347,7 +348,19 @@ def hasAvailableAmount(client, coin, reqAmount):
 	return ( reqAmount <= coinAmount)
 	
 ################  GET LAST PRICE ################
-def getLastPrice(client, pair_coin1, pair_coin2):
+def getLastPrice(client, pair_coin1, pair_coin2=None):
+	"""
+		compatible for coins as well as markets as argument
+	"""
+	if(pair_coin2 is None):
+		try:
+			trades = client.get_recent_trades(symbol=(pair_coin1), limit=5)
+			lastTrade = trades[4]
+			lastTradePrice = float(lastTrade['price'])
+			return lastTradePrice
+		except:
+			return 0
+		
 	try:
 		trades = client.get_recent_trades(symbol=(pair_coin1 + pair_coin2), limit=5)
 		lastTrade = trades[4]
@@ -460,11 +473,15 @@ def updatePriceAndQtyReqsInAllJsons(client, keyToBeUpdated, strategyFilter=None)
 							sharedPrefData[keyToBeUpdated] = priceReqs_new
 							dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
 
-# TODO_future repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
-def updateSingleEntryAmounts(client, keyToBeUpdated, valToBeUpdated, strategyFilter=None):
+# TODO repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
+# TODO teraz to uz je aj nejake pokaze, lebo mas uz aj valToBeUpdated aj sourceFileName - bud jedno alebo druhe pouzivaj
+#def updateJsonTriggerFiles(keyToBeUpdated, valToBeUpdated, sourceFileName=None, strategyFilter=None, clientName=None):
+def updateJsonTriggerFiles(keyToBeUpdated, valToBeUpdated):
 	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
 	for file in os.listdir(sharedPrefRootFolder):
 		if (isInitJsonNotTeplate(file)):
+			# TODO_future tu si vies pomoct s funktiou get stategy and cleint from filename
+			# + este chyba filter na clienta
 			if ((strategyFilter is None) or ((strategyFilter + '_') in file)):
 				with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
 					sharedPrefData = json.load(sharedPrefFile)
@@ -528,11 +545,22 @@ def validLimitPriceAndQty(reqDic, symbol, desiredPrice, desiredQty, limitKoef):
 	tmp.update({'stopPrice': validPrice(reqDic, desiredPrice*limitKoef)})
 	return tmp
 
-def getValFromSharedPrefFile(fileName, varName):
-	with open(getScriptLocationPath(0) + r"\sharedPrefs\\" + fileName, mode='r') as sharedPrefFile:
+def getValFromSharedPrefFile(fileNameWithExtention, varName):
+	"""
+	 retuns None for non-existent variables or non-existent files
+	"""
+	from pathlib import Path
+	sharedPrefFile = getScriptLocationPath(0) + r"\sharedPrefs\\" + fileNameWithExtention
+	if not Path(sharedPrefFile).is_file():
+		ploggerWarn('Following path of a shared file was not found: ' + getScriptLocationPath(0) + r"\sharedPrefs\\" + fileNameWithExtention)
+		return None
+	with open(sharedPrefFile, mode='r') as sharedPrefFile:
 		sharedPrefData = json.load(sharedPrefFile)
 		r = sharedPrefData.get(varName, None)
+		if r is None:
+			ploggerWarn('The variable ' + varName + ' could not be found in the shared file with following path: ' + getScriptLocationPath(0) + r"\sharedPrefs\\" + fileNameWithExtention, False)
 		return r 
+
 
 ################  CALCULATES THE StDEV OF A PAIR FOR A GIVEN TIMEFRAME ################
 #REMMIROdef getAverageDeviationOfLastPriceMovements(pair, client_curr, period, interval):
