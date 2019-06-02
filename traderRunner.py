@@ -45,8 +45,8 @@ bm = BinanceSocketManager(clients['tibRick'])
 #############		PRE - CHECKS		##############
 ######################################################
 
-traderFunctions.checkExchangeStatus(clients['tibRick'])
-traderFunctions.checkTimeSyncErrAndLoop(clients['tibRick'], 20, 300)
+traderFunctions.checkExchangeStatus(clients['mno'])
+traderFunctions.checkTimeSyncErrAndLoop(clients['mno'], 20, 300)
 
 
 ######################################################
@@ -239,9 +239,9 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 	# MANDATORY INIT VARS = mandatoryInitVars
 
 # TODO v buducnu daj viac genericku fciu, kde budes vediet adavat nazvy strategii pre filtre, alebo ako tuto pouzi defaultnu hodnotu ktora updatene setky jsony
-traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['tibRick'], 'u_PriceQtyReqs')
+traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['mno'], 'u_PriceQtyReqs')
 # VERY DIRTY
-traderFunctions.updateSingleEntryAmounts(clients['tibRick'], 'u_singleEntryAmounts', {"3": 15,"6": 21,"9": 29,"12": 41, "15": 58,"18": 81, "21": 113,"24": 158, "27": 221, "30": 310,"33": 434,"36": 607}, 'pumpTheRightCoin')
+traderFunctions.updateSingleEntryAmounts(clients['mno'], 'u_singleEntryAmounts', {"3": 15,"6": 21,"9": 29,"12": 41, "15": 58,"18": 81, "21": 113,"24": 158, "27": 221, "30": 310,"33": 434,"36": 607}, 'pumpTheRightCoin')
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)

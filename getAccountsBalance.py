@@ -10,7 +10,8 @@ from binance.enums import *
 ######################################################
 #############		START LOGGING			##########
 ######################################################
-#musi byt, lebo niektore metody z traderFunctions maju implementovany logging
+# musi byt, lebo niektore metody z traderFunctions maju implementovany logging
+# v buducnosti ked to bude cast guardiana to uz nebudes potrebovat
 traderFunctions.startLoggers()
 
 ######################################################
