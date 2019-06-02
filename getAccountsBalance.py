@@ -90,9 +90,9 @@ if (lastRunDate == time.strftime("%d.%m.")):
 lineBreak = '\n'
 
 #replace time
-timePlchldr_begin = 'LastRun: '
+timePlchldr_begin = 'Report from: '
 #timePlchldr_end = '</p></b>'
-regexTimePlchldr = re.compile("LastRun: .*")
+regexTimePlchldr = re.compile("Report from: .*")
 htmlContent = re.sub(regexTimePlchldr, timePlchldr_begin + time.strftime("%d.%m.%Y %H:%M:%S"), htmlContent)
 
 #replace DetailedBalanceSheets
@@ -106,10 +106,6 @@ htmlContent = re.sub(regexPlchldr, plchldr_begin + detailedBalanceSheets_mno, ht
 #extend USD chart
 plchldr = '//$$DATACHART_USD$$'
 htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_USDT, -2)) +", "+ str(spoluVlozene_USD) +", "+ str(spoluPozicane_USD) + "]," + lineBreak + plchldr)
-
-#extend BTC chart
-plchldr = '//$$DATACHART_BTC$$'
-htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_BTC, 2)) + "]," + lineBreak + plchldr)
 
 #extend BTC_tibRick chart
 plchldr = '//$$DATACHART_BTC_tibRick$$'

@@ -22,10 +22,10 @@ traderFunctions.startLoggers()
 strats = {}
 mandatoryInitVars = {}
 sharedPrefFileGuardian = 'guardian_lastClbkTime'
+fileWithLoopTimesForGuardian = 'guardian_loopTimeInMin.json'
+guardian_loopTimeInMin = (traderFunctions.getValFromSharedPrefFile(fileWithLoopTimesForGuardian, 'guardian_loopTimeInMin'))
 sharedPrefFileSkipClbkMsgDueDelay = 'lastTimeAClbkMsgWasSkipepd'
 stopFlagFileName = 'runnerSTOPFlag_anyContentWillStop.txt'
-# daj pozor aky mas max limit pri sys.setrecursionlimit(), pre 1500 rekurzii kolko minut, na tolko dni ti to vystaci
-guardianLoopingTimeInMin = 5
 # pociatocna hodnota, hned pri prvom loope sa potom nastavi na spravnu
 clbkCounterForGuardian = 0
 scriptLocationPath = traderFunctions.getScriptLocationPath(0)
@@ -120,20 +120,10 @@ def stopIfFlag(flagFileName):
 		f.close()
 		if not (content == ''):
 			traderFunctions.ploggerWarn('Found a flag in file ' + flagFileName + '. Will stop the socket', False)
+			# wiping the content of the file
 			fw = open(flagFileLocation, mode='w')
 			fw.close()
 			closeSocketAndRestartThisFile(False)
-
-def runGuardian(sharedPrefFileName, sleepTimeInMin):
-	while (True):
-		time.sleep(sleepTimeInMin * 60)
-		traderFunctions.ploggerInfo('Guardian is checking if the the websocket is still alive')
-		
-		#check if the clbk fcion did write in the last sleepTimeInMin
-		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
-			# if did not write, that means the clbk is not running
-			traderFunctions.ploggerErr ('Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago. Will try to restart the socket')
-			closeSocketAndRestartThisFile(True)
 		
 def getTimeFromClbkMsg(msg):
 	try:
@@ -205,7 +195,7 @@ def trader_callbck(msg):
 	
 	if ( clbkCounterForGuardian < 1 ):
 		traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
-		clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardianLoopingTimeInMin)
+		clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardian_loopTimeInMin)
 	
 	# running the check for stopping the script every 90s
 	if(clbkCounterForGuardian % 90 == 0):
@@ -251,7 +241,7 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 # TODO v buducnu daj viac genericku fciu, kde budes vediet adavat nazvy strategii pre filtre, alebo ako tuto pouzi defaultnu hodnotu ktora updatene setky jsony
 traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['tibRick'], 'u_PriceQtyReqs')
 # VERY DIRTY
-traderFunctions.updateSingleEntryAmounts(clients['tibRick'], 'u_singleEntryAmounts', {"3": 33, "6": 50, "9": 75, "12": 113, "15": 169, "18": 254}, 'pumpTheRightCoin')
+traderFunctions.updateSingleEntryAmounts(clients['tibRick'], 'u_singleEntryAmounts', {"3": 15,"6": 21,"9": 29,"12": 41, "15": 58,"18": 81, "21": 113,"24": 158, "27": 221, "30": 310,"33": 434,"36": 607}, 'pumpTheRightCoin')
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)
@@ -269,4 +259,3 @@ traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 # 5, pre kazdy ucet budes mat array s velkostou Qty pre jednotlive nakupy, pri starte skritu updatenes aj tieto hodnoty
 # 6, convert small amounts to BNB
 startTraderSocket()
-runGuardian(sharedPrefFileGuardian, guardianLoopingTimeInMin)

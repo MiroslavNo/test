@@ -10,13 +10,19 @@ from decimal import Decimal
 ######################################################
 infoLogger = logging.getLogger('infoLogger')
 errorLogger = logging.getLogger('errorLogger')
+tradesLogger = logging.getLogger('tradesLogger')
 
 sharedPrefFileLastEmail = 'emailNotification_lastWarningEmailTime'
 
+SEP = ';'
+DOT = '.'
+COMMA = ','
+	
 def startLoggers():
 	from pathlib import Path
 	global infoLogger
 	global errorLogger
+	global tradesLogger
 	
 	# rolling infoLogger sa vyriesil tak, ze pri kazdom starte sa stary subor premenuje s time stamp-om ak vacsi nez 7,5 Mb
 	pathInfoLogger = Path(getScriptLocationPath(1) + r'\ReportsAndLogs\traderLog.log')
@@ -36,6 +42,12 @@ def startLoggers():
 	errorHandler.setFormatter(formatter)
 	errorLogger.setLevel(logging.INFO)
 	errorLogger.addHandler(errorHandler)
+	
+	# TODO_future toto by muselo byt rozdielne pre rozne ucty
+	tradesHandler = logging.FileHandler( getScriptLocationPath(1) + r'\ReportsAndLogs\trades.csv')
+	tradesHandler.setFormatter(formatter)
+	tradesLogger.setLevel(logging.INFO)
+	tradesLogger.addHandler(tradesHandler)
 
 
 #################  print loggers ################
@@ -59,6 +71,28 @@ def ploggerErr(msg):
 	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 		send_email('TRADER - Logger ERR', msg)
 		writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
+
+def ploggerTrades(symbol, stepNr, entryType, price, diffTriggPriceVsExecPrice, gain, amount):
+	"""
+	 # entryType can be also START and EXIT ( if step was created / removed )
+	 # diffTriggPriceVsExecPrice is difference in percentage of the planned price and the price which was reached in the market oreder: a negative value means that the difference is against me, a positive value would mean that I got lucky and even got a better price than planned
+	 # gain is a percentage which describes how much I could earn in relation to the last trade: a negative value means that the trade made a loss - here the weight of the entry is not condidered
+	"""
+	msg = SEP + symbol + SEP + str(stepNr).replace(DOT, COMMA) + SEP + entryType + SEP + str(price).replace(DOT, COMMA) + SEP + str(diffTriggPriceVsExecPrice).replace(DOT, COMMA) + SEP + str(gain).replace(DOT, COMMA) + SEP + str(amount).replace(DOT, COMMA)
+	tradesLogger.info(msg)
+	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - TRADE - ' + msg)
+
+def formatDictForPrint(d, tab=0):
+    s = ['{\n']
+    for k,v in d.items():
+        if isinstance(v, dict):
+            v = format(v, tab+1)
+        else:
+            v = repr(v)
+
+        s.append('%s%r: %s,\n' % ('  '*tab, k, v))
+    s.append('%s}' % ('  '*tab))
+    return ''.join(s)
 
 #################		GET CLIENTS		#################
 # @Tested
@@ -103,7 +137,7 @@ def checkIfInitVarHasValue(jsonName, dict, requiredInitialValuesDict):
 		print('ERR - The json trigger file with the name ' + jsonName + ' will be skipped')
 		return False
 	for k_varToCheck_name, v_varToCheck_descr in varsToCheck_names.items():
-		if k_varToCheck_name.startswith('a_'):
+		if (k_varToCheck_name.startswith('a_') or k_varToCheck_name.startswith('u_')):
 			varToCheck_valueInJson = dict.get(k_varToCheck_name, None) 
 			if (varToCheck_valueInJson == None):
 				print('ERR - Trader(runner) - In the init file with name "' + jsonName + '" the var "'  + k_varToCheck_name + '" has None value')
@@ -189,8 +223,8 @@ def convertEpochToTimestamp(ts_epoch, epochInMiliseconds=True, format='%Y-%m-%d 
 
 #################  PART OF THE GUARDIAN FUNCTIONALITY ################
 def setclbkCounterForGuardian(loopingTimeInMin):
-	# 1,05 je bezpecnostny koef
-	writingTimeInSec = int(round(loopingTimeInMin * 60 / 1.05))
+	# 1,25 je bezpecnostny koef
+	writingTimeInSec = int(round(loopingTimeInMin * 60 / 1.25))
 	return writingTimeInSec
 	
 #################  SYTEM TIME ################
@@ -349,7 +383,7 @@ def send_email(subject, msg):
 		# creates SMTP session 
 		# mozne servre pre tuto schranku najdes na:
 		# https://admin.websupport.sk/sk/email/mailbox/loginInformation/874582?domainId=174657&mailboxId=394385&domain=volebnyprieskum.sk
-		# TODO prerob na sifrovane spojenie
+		# TODO_future prerob na sifrovane spojenie
 		s = smtplib.SMTP('smtp.websupport.sk', 25)
 		# start TLS for security 
 		s.starttls()
@@ -426,7 +460,7 @@ def updatePriceAndQtyReqsInAllJsons(client, keyToBeUpdated, strategyFilter=None)
 							sharedPrefData[keyToBeUpdated] = priceReqs_new
 							dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
 
-# TODO repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
+# TODO_future repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
 def updateSingleEntryAmounts(client, keyToBeUpdated, valToBeUpdated, strategyFilter=None):
 	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
 	for file in os.listdir(sharedPrefRootFolder):
@@ -440,8 +474,7 @@ def updateSingleEntryAmounts(client, keyToBeUpdated, valToBeUpdated, strategyFil
 						sharedPrefData[keyToBeUpdated] = valToBeUpdated
 						dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
 
-# TODO v buducnu by tieto 2 fcie mohli byt priamo v binance module a mohol by si mat custom metody napr: order_market_buy_valid			
-
+# TODO_future v buducnu by tieto 2 fcie mohli byt priamo v binance module a mohol by si mat custom metody napr: order_market_buy_valid			
 def validPrice(reqDic, desiredPrice):
 	#price >= minPrice
 	#(price-minPrice) % tickSize == 0
@@ -494,6 +527,12 @@ def validLimitPriceAndQty(reqDic, symbol, desiredPrice, desiredQty, limitKoef):
 	tmp = validPriceAndQty(reqDic, symbol, desiredPrice, desiredQty)
 	tmp.update({'stopPrice': validPrice(reqDic, desiredPrice*limitKoef)})
 	return tmp
+
+def getValFromSharedPrefFile(fileName, varName):
+	with open(getScriptLocationPath(0) + r"\sharedPrefs\\" + fileName, mode='r') as sharedPrefFile:
+		sharedPrefData = json.load(sharedPrefFile)
+		r = sharedPrefData.get(varName, None)
+		return r 
 
 ################  CALCULATES THE StDEV OF A PAIR FOR A GIVEN TIMEFRAME ################
 #REMMIROdef getAverageDeviationOfLastPriceMovements(pair, client_curr, period, interval):
