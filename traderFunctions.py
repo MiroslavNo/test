@@ -51,25 +51,25 @@ def startLoggers():
 
 
 #################  print loggers ################
+# TODO infor, warn a err stringy daj ako konstanty, tiez format casu
 def ploggerInfo(msg,toprint=False):
 	infoLogger.info(msg)
 	if toprint:
-		print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - Info - ' + msg)
+		print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - INFO - ' + msg)
 def ploggerWarn(msg, sendEmail=True):
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - Warn - ' + msg)
-	errorLogger.warn('Warn - ' + msg)
-	infoLogger.info('Warn - ' + msg)
+	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - WARN - ' + msg)
+	errorLogger.warn('WARN - ' + msg)
+	infoLogger.info('WARN - ' + msg)
 	if(sendEmail):
 		if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 			send_email('TRADER - Logger WARN', msg)
 			writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
 
 def ploggerErr(msg):
-	# print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - Err - ' + msg)
-	# the msg should be printed automatically but a timestpamt would be nice
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")))
-	errorLogger.error('Err - ' + msg)
-	infoLogger.info('Err - ' + msg)
+	# the msg should be printed automatically but it does not happen always
+	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - ERR - ' + msg)
+	errorLogger.error('ERR - ' + msg)
+	infoLogger.info('ERR - ' + msg)
 	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 		send_email('TRADER - Logger ERR', msg)
 		writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
@@ -84,16 +84,8 @@ def ploggerTrades(symbol, stepNr, entryType, price, diffTriggPriceVsExecPrice, g
 	tradesLogger.info(msg)
 	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - TRADE - ' + msg)
 
-def formatDictForPrint(d, tab=0):
-	if d is None:
-		return None
-	s = ['{\n']
-	for k,v in d.items():
-		if not isinstance(v, dict):
-			v = repr(v)
-		s.append('%s%r: %s,\n' % ('  '*tab, k, v))
-	s.append('%s}' % ('  '*tab))
-	return ''.join(s)
+def formatDictForPrint(d):
+	return json.dumps(d, indent=2)
 
 #################		GET CLIENTS		#################
 # @Tested
@@ -147,10 +139,13 @@ def checkIfInitVarHasValue(jsonName, dict, requiredInitialValuesDict):
 	return True
 
 def getClientAndStrategyFromFileName(fileName):
+	"""
+		it is required, that the strategy is the first on the filename and the client the last, otherwise wont work
+	"""
 	r = {}
 	fileNameList = fileName.split("_")
 	r['strategy'] = fileNameList[0]
-	client = fileNameList[1]
+	client = fileNameList[len(fileNameList)-1]
 	# in case the name of the json is only 'strategyName_client.json'
 	if client.endswith('.json'):
 		client = client[:-5]
@@ -169,7 +164,7 @@ def loadAllInitJsons(requiredInitialValuesDict):
 				sharedPrefData = json.load(sharedPrefFile)
 				clientAndStrategyNames = getClientAndStrategyFromFileName(file)
 				sharedPrefData.update(clientAndStrategyNames)
-				if ( checkIfInitVarHasValue( file, sharedPrefData, requiredInitialValuesDict ) ):
+				if ( (requiredInitialValuesDict is None) or (checkIfInitVarHasValue( file, sharedPrefData, requiredInitialValuesDict )) ):
 					allJsonsDict[file[:-5]] = sharedPrefData
 				sharedPrefFile.close()
 	return allJsonsDict
@@ -296,7 +291,9 @@ def getPricesFromClbkMsg(tickerDict):
 			symbol = dict.get('s', 'key not found')
 			# if ( (symbol.upper().endswith('BTC')) or (symbol.upper().endswith('USDT')) ):
 			if (symbol.upper().endswith('USDT')):
-				result[symbol] = {'c': float(dict.get('c', 0)), 'b': float(dict.get('b', 0)), 'a': float(dict.get('a', 0)), 'q': float(dict.get('q', 0))}
+				# TODO_future these other data might be usefull in the future but not now, so taking only the 'c' 
+				# result[symbol] = {'c': float(dict.get('c', 0)), 'b': float(dict.get('b', 0)), 'a': float(dict.get('a', 0)), 'q': float(dict.get('q', 0))}
+				result[symbol] = float(dict.get('c', 0))
 		return result
 	else:
 		traderFunctions.ploggerErr ('Unknown callback message type')
@@ -336,7 +333,19 @@ def getAccoutBalances(client, defCoin, minAmountReq, bPrint):
 		print ('_________________')
 		print (sumInDefCoin)
 	return balances_inDefCoin
-	
+
+def getCoinStocs(client, defCoin='USDT', includeZeroValues=False):
+	r={}
+	account_info = client.get_account()
+	balances=account_info.get('balances', 'Key Not Found')
+	for balance in balances:
+		amount = float(balance.get('free')) + float(balance.get('locked'))
+		if (includeZeroValues or (amount > 0)):
+			assetName = balance.get('asset')
+			if(assetName != defCoin):
+				r[assetName] = amount
+	return r
+		
 #################  GET AVAILABLE AMOUNT ################
 def	getAvailableAmount(client, coin, roundDigits=2):
 	coinAmount = float(client.get_asset_balance(asset=coin).get('free'))
@@ -388,7 +397,8 @@ def getFirstEntryInOrderBook(client, sellOrBuy, pair):
 ################  SEND EMAIL ################
 def send_email(subject, msg):
 	from sharedPrefs import email_config
-	emailDic=email_config.EMAILS['notif']	
+	emailDic=email_config.EMAILS['notif']
+	subject = subject + '_{}'.format(str(datetime.datetime.now().strftime("%H:%M")))
 	
 	ploggerInfo('Will send an email with the subject: ' +  subject)
 	try:
@@ -412,7 +422,8 @@ def send_email(subject, msg):
 ################  Check Last Occurence ################
 def checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, timeLimitInSec):
 	sharedPrefFileLocation = r"sharedPrefs\\" + sharedPrefFileName + '.json'
-	ploggerInfo('Testing if event in the file ' + sharedPrefFileName + ' was less than ' + str(timeLimitInSec) + ' seconds ago' )
+	# DEBUG
+	# ploggerInfo('Testing if event in the file ' + sharedPrefFileName + ' was less than ' + str(timeLimitInSec) + ' seconds ago' )
 	with open(getScriptLocationPath(0) + "\\" + sharedPrefFileLocation, mode='r') as sharedPrefFile:
 		sharedPrefData = json.load(sharedPrefFile)
 		sharedPrefFile.close()
@@ -473,16 +484,14 @@ def updatePriceAndQtyReqsInAllJsons(client, keyToBeUpdated, strategyFilter=None)
 							sharedPrefData[keyToBeUpdated] = priceReqs_new
 							dumpGlobalVariablesToJson(file[:-5], sharedPrefData, getScriptLocationPath(0))
 
-# TODO repeating the function above, but can not get rid of the logical prob around the usage of tradedSymbol
-# TODO teraz to uz je aj nejake pokaze, lebo mas uz aj valToBeUpdated aj sourceFileName - bud jedno alebo druhe pouzivaj
-#def updateJsonTriggerFiles(keyToBeUpdated, valToBeUpdated, sourceFileName=None, strategyFilter=None, clientName=None):
-def updateJsonTriggerFiles(keyToBeUpdated, valToBeUpdated):
+# TODO_future v buducnu by si mozno mohol priamo zadat z ktoreho pref fiel to ma zobrat, teda mat sourceFileNamenamiesto valToBeUpdated
+# def updateJsonTriggerFiles(keyToBeUpdated, sourceFileName, strategyFilter=None, clientName=None):
+def updateJsonTriggerFiles(keyToBeUpdated, valToBeUpdated, strategyFilter=None, clientFilter=None):
 	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
 	for file in os.listdir(sharedPrefRootFolder):
 		if (isInitJsonNotTeplate(file)):
-			# TODO_future tu si vies pomoct s funktiou get stategy and cleint from filename
-			# + este chyba filter na clienta
-			if ((strategyFilter is None) or ((strategyFilter + '_') in file)):
+			stratAndClient = getClientAndStrategyFromFileName(file)
+			if ( ((strategyFilter is None) or (stratAndClient['strategy'] == strategyFilter)) and ((clientFilter is None) or (stratAndClient['client'] == clientFilter)) ):
 				with open(sharedPrefRootFolder + "\\" + file, mode='r') as sharedPrefFile:
 					sharedPrefData = json.load(sharedPrefFile)
 					dic_old = sharedPrefData.get(keyToBeUpdated, '')
@@ -561,7 +570,71 @@ def getValFromSharedPrefFile(fileNameWithExtention, varName):
 			ploggerWarn('The variable ' + varName + ' could not be found in the shared file with following path: ' + getScriptLocationPath(0) + r"\sharedPrefs\\" + fileNameWithExtention, False)
 		return r 
 
+def convertDustToBNB(client, clientName):
+	pass
 
+# TODO move to pumTheRightCon because of the constants which are beeing used here - also wanted to move use the spawner in the runner so this is kinda the same
+def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInDefCoin=10):
+	"""
+		looping through trigger jsons, counting what amout of stocks I should have and comparing with the real numbers
+		not taking care of jsons which would have a coin in the which no longer exists -> in such case the whole json would crash
+	"""
+	r = False
+	jsonStocks = {}
+	
+	initJsons = loadAllInitJsons(None)
+	for k, intiJson in initJsons.items():
+		# TODO dopln filter if key obsahuje danu strategiu - zatial ale nie je kriticke
+		if(clientName in k):
+			coin = intiJson['a_symbol']
+			if(coin.endswith(defCoin)):
+				coin = coin[:-4]
+			else:
+				ploggerWarn('diffRealAndExpectCoinStocks - a NON-USDT market was found in the int jsons - this was not expected!', False)
+
+			entries = intiJson['entries']
+			totalStock_json = 0
+			lastXchangePrice = 0
+			
+			for stepNr, entry in entries.items():
+				totalStock_json = totalStock_json + entry['qty']
+				# lastXchangePrice = entry['lastXchangePrice']
+			
+			jsonStocks[coin] = totalStock_json
+	realStocks = getCoinStocs(client, defCoin, True)
+	
+	for coinName, realStock in realStocks.items():
+		if(coinName==defCoin):
+			continue
+		jsonStock = jsonStocks.get(coinName, 0.0)
+		# if at least 1 of them not 0
+		if((realStock + jsonStock) > 0.0):
+			# check the diff in USDT - checkig the diff in the coin itself is useless, because there will be always a discprepancy of some sort
+			lastPrice = getLastPrice(client, coinName, defCoin)
+			if (lastPrice == 0):
+				# can calculate the value in USDT - in future try combination with BTC
+				if(realStock != jsonStock):
+					ploggerWarn('diffRealAndExpectCoinStocks - discrepancy of Unknown {} amount found in the stock of coin {}. jsonStock={} / realStock={}'.format(defCoin, coinName, str(jsonStock), str(realStock)))
+					r = True
+
+			discrepancy = round((jsonStock - realStock) * lastPrice)
+			# TODO by now just hardcoding 50 USDT
+			BNBtolerability = 900
+			if(coinName=='BNB'):
+				if (discrepancy > 0):
+					discrepancy = max(discrepancy - BNBtolerability, 0)
+				elif (discrepancy < 0):
+					discrepancy = min(discrepancy + BNBtolerability, 0)
+					
+			# if discrepancy a positive number -> more in json than in reality
+			if( discrepancy > tolerancyInDefCoin):
+				ploggerWarn('diffRealAndExpectCoinStocks - discrepancy of {} {} found in the stock of coin {}. jsonStock={} > realStock={}'.format(str(discrepancy), defCoin, coinName, str(jsonStock), str(realStock)))
+				r = True
+			elif (discrepancy < (-1.0 * tolerancyInDefCoin)):
+				ploggerErr('diffRealAndExpectCoinStocks - FIX NEEDED discrepancy of {} {} found in the stock of coin {}. jsonStock={} < realStock={}'.format(str(abs(discrepancy)), defCoin, coinName, str(jsonStock), str(realStock)))
+				r = True
+	return r
+	
 ################  CALCULATES THE StDEV OF A PAIR FOR A GIVEN TIMEFRAME ################
 #REMMIROdef getAverageDeviationOfLastPriceMovements(pair, client_curr, period, interval):
 #REMMIRO	import statistics

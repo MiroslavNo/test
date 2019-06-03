@@ -167,26 +167,28 @@ def trader_callbck(msg):
 	
 	# skip if time difference is bigger than 2sec (2000 mSec) - since it can happen, that my clbk processing will be slower than the interval of the clbks (1 sec)
 	if( (1000 * time.time() - timeFromClbkMsg) > 1750 ):
-		traderFunctions.ploggerInfo('Warn - Websocket - The timestamp in the clbk msg is in the past. The difference is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
+		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
+		# commenting some bits out because clogging the log
 		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
-			traderFunctions.ploggerInfo('Warn - Websocket - SKIPPING this clbk msg', False)
+			# traderFunctions.ploggerInfo('Warn - Websocket - SKIPPING this clbk msg', False)
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
-		else:
-			traderFunctions.ploggerInfo('Warn - Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
+		# else:
+		#	traderFunctions.ploggerInfo('Warn - Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
 	
 	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 		
 	tmp = {}
 	# TODO_future malo by to tak fungovat lepsie, ze traderFunctions by si prerobil na classu a dictionary spolu s clientom by boli member variables - tym padom by si nemusel volat funkciu s parametrami, ale vzdy by si iba zavolal metodu trade na danom objecte 
 	for k, singleJsonDic in globalVariablesDictionary.items():
-		try:
-			r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
-			if not (r is None):
-				tmp[k] = r
-		except Exception:
-			traderFunctions.ploggerErr('Following traceback error came from the strategy module:\n ' + traceback.format_exc())
+		# kym som si neni isty chybami, tak zakomentujem try catch
+		#try:
+		r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
+		if not (r is None):
+			tmp[k] = r
+		#except Exception:
+		#	traderFunctions.ploggerErr('Following traceback error came from the strategy module:\n ' + traceback.format_exc())
 
 	#Empty dictionaries evaluate to False in Python
 	if bool(tmp):
@@ -240,8 +242,7 @@ for importer, modname, ispkg in pkgutil.iter_modules(strat.__path__, strat.__nam
 
 traderFunctions.updatePriceAndQtyReqsInAllJsons(clients['mno'], 'u_PriceQtyReqs')
 # TODO v buducnu daj viac genericku fciu, kde budes vediet davat nazvy strategii ako filter, lebo pri inych strategiach by tieto hodnoty boli nechcene. A takisto filter pre clientov, lebo na kazdom ucte su ine sumy a to ma tiez vplyv v urcitych pripadoch
-# VERY DIRTY
-traderFunctions.updateJsonTriggerFiles('u_singleEntryAmounts', )
+traderFunctions.updateJsonTriggerFiles('u_singleEntryAmounts', traderFunctions.getValFromSharedPrefFile('u_singleEntryAmounts_tibRick.json', 'u_singleEntryAmounts'))
 
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)

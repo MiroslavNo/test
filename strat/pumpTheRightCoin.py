@@ -78,8 +78,8 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 
 	# key stands for the name of the json
 	# jD stands for jsonDictionary
-
 	price = pricesFromTicker.get(jD[A_SYMBOL], 0)
+
 	if (price==0):
 		return None
 	
@@ -92,7 +92,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 		# 1B, ked je dany market uz nastartovany, tak pokracuje tak je to posledna (najvyssia) cena za ktoru som kupoval
 		# - v oboch pripadoch, ked je cena dosiahnuta, vytvorim market order
 		if DEBUG:
-			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_NEXT_PRICE + '=' + str(jD[C_LADDER_NEXT_PRICE]) + 'was reached')
+			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_NEXT_PRICE + '=' + str(jD[C_LADDER_NEXT_PRICE]) + ' was reached')
 		return createMarketOrderForNewLadderEntry( client, jD, price )
 		
 	if (jD[C_LADDER_HIGHEST_REACHED_STEP] <= 0 and price < jD[C_LADDER_BOTTOM_BOUNDARY]):
@@ -202,7 +202,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 		jD.update(updateSortedListsOfTresholds(jD))
 
 		for i in range(len(tmp_del)):
-			# the pop method removes an entry a the second arg is the default return val if entry not found - otherwise it returns the removed entry
+			# the pop method removes an entry and the second arg is the default return val if entry not found - otherwise it returns the removed entry
 			removedEntry = jD["entries"].pop(tmp_del[i], None)
 			if(removedEntry is None):
 				traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + 'Tried to pop(remove) the entry with the STEP_NR:' + str(tmp_del[i]) + '(the value is of the type: ' + type(tmp_del[i]) + ') but received an error, that it wasnt found in the jD')
@@ -425,6 +425,7 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 														E_CUMUL_LOSS: 0.0
 													}
 		traderFunctions.ploggerTrades(jD[A_SYMBOL], ladderHighestReachedStep, 'NEW_ENTRY', fillPrice, 0, 0, fillQty)
+		jD.update(updateSortedListsOfTresholds(jD))
 	else:
 		traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
 		return None
@@ -542,13 +543,14 @@ def startNewMarket(clientName, client, market, scriptLocationPath, mandatoryPara
 	r[U_PRICE_QTY_REQS] = (traderFunctions.getPriceAndQtyReqs(market, client))
 	# get single entry amounts
 	r[U_SINGLE_ENTRY_AMOUNTS] = (traderFunctions.getValFromSharedPrefFile(U_SINGLE_ENTRY_AMOUNTS + '_' + clientName + '.json', U_SINGLE_ENTRY_AMOUNTS))
+	r[ENTRIES]={}
+	r[C_UTS_SORTED_ASC]=[]
+	r[C_LTS_SORTED_DESC]=[]
 	
-	traderFunctions.dumpGlobalVariablesToJson(resultJsonFileName, r, scriptLocationPath)
-	
-	# tieto 2 davam az potom ako zapisal json, lebo tradeRunner funguje tak, ze si ich vzdy pri startupe precita z nazvu suboru
-	# kedze ale chces mat return an to, aby si vedel hned obchodovat, tak to v tomto dict potrebujes
 	r['strategy'] = strategyName
 	r['client'] = clientName
+	
+	traderFunctions.dumpGlobalVariablesToJson(resultJsonFileName, r, scriptLocationPath)
 	
 	return r
 

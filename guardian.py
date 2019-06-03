@@ -85,7 +85,7 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 		calcQty_inBNB = 3 * (desiredAmountOfBNB_inBNB - currentAmountOfBNB_inBNB)
 		# check if enough USDT for buying BNB (safety coef of 1.1)
 		if not (traderFunctions.hasAvailableAmount(client, USDT, (1.1 * calcQty_inBNB * lastPrice))):
-			traderFunctions.ploggerWarn('There is not enough USDT for buying BNB for fees. Free USDT=' + str(traderFunctions.traderFunctions.getAvailableAmount(client, USDT, roundDigits=0)) + ' / USDT required to buy BNB=' + str(1.1 * calcQty_inBNB * lastPrice), False)
+			traderFunctions.ploggerWarn('There is not enough USDT for buying BNB for fees. Free USDT=' + str(traderFunctions.getAvailableAmount(client, USDT, roundDigits=0)) + ' / USDT required to buy BNB=' + str(1.1 * calcQty_inBNB * lastPrice), False)
 		else:
 			# get valid amount
 			calcQty_inBNB = traderFunctions.validQty(traderFunctions.getPriceAndQtyReqs(BNBUSDT, client), lastPrice, calcQty_inBNB)
@@ -95,9 +95,8 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 
 def runGuardian(sharedPrefFileName, sleepTimeInMin):
 	counter=0
-	counterCycleForBNBUpdate = round (intervalInMinForBNBUpdate / sleepTimeInMin)
-	counterCycleForBalanceUpdate = round (intervalInMinForBalanceUpdate / sleepTimeInMin)
-	traderFunctions.ploggerInfo('GUARDIAN - START', True)
+	counterCycleForBNBUpdate = round (bnbUpdate_loopTimeInMin / sleepTimeInMin)
+	counterCycleForBalanceUpdate = round (balanceUpdate_loopTimeInMin / sleepTimeInMin)
 	
 	while (True):
 		time.sleep(sleepTimeInMin * 60)
@@ -112,8 +111,13 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 				for k, client in clients.items():
 					if (k != 'mno'):
 						ensureBNBforFees(client, 50000)
+						if(traderFunctions.diffRealAndExpectCoinStocks(clients[k], k)):
+							# TODO only in the testing phase, to prevent further damage
+							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
+							os.system('C:\Users\tagueri\Google Drive\crpt\bot\batch\02_STOP tradeRunner.bat')
 			if(counter % counterCycleForBalanceUpdate == 0):
 				# TODO prerob v buducnu, aj tak getAccountsBalance bude treba viac zgeneralizovat
+				# nemal by si to mat takto, lebo to nechava otvoreny connection a po case dosiahne limit poctu pripojeni
 				os.system('getAccountsBalance.py')
 		else:
 			# resetting the counter just to be sure the wont be interference between get BNB or get BALANCE
@@ -168,8 +172,13 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 # pre checks
 traderFunctions.checkExchangeStatus(clients['mno'])
 traderFunctions.checkTimeSyncErrAndLoop(clients['mno'], 20, 300)
+traderFunctions.ploggerInfo('GUARDIAN - START', True)
 # ensureBNBforFees at the beginning as well, because if trades happen at the very beggining
-ensureBNBforFees(clients['tibTick'], 50000)
+ensureBNBforFees(clients['tibRick'], 50000)
+if(traderFunctions.diffRealAndExpectCoinStocks(clients['tibRick'], 'tibRick')):
+	# TODO only in the testing phase, to prevent further damage
+	traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
+	os.system('C:\Users\tagueri\Google Drive\crpt\bot\batch\02_STOP tradeRunner.bat')
 runGuardian(sharedPrefFileGuardian, guardian_loopTimeInMin)
 traderFunctions.ploggerErr ('ERROR - THE GUARDIAN HAS STOPPED')
 	
