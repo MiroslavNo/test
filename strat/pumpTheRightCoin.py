@@ -337,19 +337,10 @@ def lTwaitToBuy(currPrice, stepDic):
 	return stepDic
 
 def lTwaitToSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, cumulLossLimit, sensitivity):
-	if DEBUG:
-		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 1')
-		
 	# dosiahol si cenu ktora je ako keby taky stop loss po tom ako si vstupil do lTwaitToSell
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
-	if DEBUG:
-		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 2')
 	marketOrderStats = client.order_market_sell(symbol=tradedSymbol, quantity=calcQty)
-	if DEBUG:
-		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 3')
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
-		if DEBUG:
-			traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 4')
 		fillQty = float(marketOrderStats[EXEC_QTY])
 		fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 		# calc gain (result is inkl. fees)
