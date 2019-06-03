@@ -17,7 +17,13 @@ sharedPrefFileLastEmail = 'emailNotification_lastWarningEmailTime'
 SEP = ';'
 DOT = '.'
 COMMA = ','
-	
+INFO = ' - INFO - '
+WARN = ' - WARN - '
+ERR = ' - ERR - '
+TIMESTAMP_FORMAT = '%d.%m %H:%M:%S'
+TRADE_CAT = ' - TRADE - '
+
+
 def startLoggers():
 	from pathlib import Path
 	global infoLogger
@@ -55,11 +61,11 @@ def startLoggers():
 def ploggerInfo(msg,toprint=False):
 	infoLogger.info(msg)
 	if toprint:
-		print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - INFO - ' + msg)
+		print(str(datetime.datetime.now().strftime(TIMESTAMP_FORMAT)) + INFO + msg)
 def ploggerWarn(msg, sendEmail=True):
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - WARN - ' + msg)
-	errorLogger.warn('WARN - ' + msg)
-	infoLogger.info('WARN - ' + msg)
+	print(str(datetime.datetime.now().strftime(TIMESTAMP_FORMAT)) + WARN + msg)
+	errorLogger.warn(WARN[3:] + msg)
+	infoLogger.info(WARN[3:] + msg)
 	if(sendEmail):
 		if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 			send_email('TRADER - Logger WARN', msg)
@@ -67,9 +73,9 @@ def ploggerWarn(msg, sendEmail=True):
 
 def ploggerErr(msg):
 	# the msg should be printed automatically but it does not happen always
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - ERR - ' + msg)
-	errorLogger.error('ERR - ' + msg)
-	infoLogger.info('ERR - ' + msg)
+	print(str(datetime.datetime.now().strftime(TIMESTAMP_FORMAT)) + ERR + msg)
+	errorLogger.error(ERR[3:] + msg)
+	infoLogger.info(ERR[3:] + msg)
 	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
 		send_email('TRADER - Logger ERR', msg)
 		writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
@@ -82,7 +88,7 @@ def ploggerTrades(symbol, stepNr, entryType, price, diffTriggPriceVsExecPrice, g
 	"""
 	msg = SEP + symbol + SEP + str(stepNr).replace(DOT, COMMA) + SEP + entryType + SEP + str(price).replace(DOT, COMMA) + SEP + str(diffTriggPriceVsExecPrice).replace(DOT, COMMA) + SEP + str(gain).replace(DOT, COMMA) + SEP + str(amount).replace(DOT, COMMA)
 	tradesLogger.info(msg)
-	print(str(datetime.datetime.now().strftime("%d.%m %H:%M:%S")) + ' - TRADE - ' + msg)
+	print(str(datetime.datetime.now().strftime(TIMESTAMP_FORMAT)) + TRADE_CAT + msg)
 
 def formatDictForPrint(d):
 	return json.dumps(d, indent=2)
@@ -570,10 +576,11 @@ def getValFromSharedPrefFile(fileNameWithExtention, varName):
 			ploggerWarn('The variable ' + varName + ' could not be found in the shared file with following path: ' + getScriptLocationPath(0) + r"\sharedPrefs\\" + fileNameWithExtention, False)
 		return r 
 
+# TODO_future
 def convertDustToBNB(client, clientName):
 	pass
 
-# TODO move to pumTheRightCon because of the constants which are beeing used here - also wanted to move use the spawner in the runner so this is kinda the same
+# TODO currently is in the guardian, but maybe should be in pumTheRightCon because of the constants which are beeing used here - also wanted to move use the spawner in the runner so this is kinda the same
 def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInDefCoin=10):
 	"""
 		looping through trigger jsons, counting what amout of stocks I should have and comparing with the real numbers
@@ -618,13 +625,13 @@ def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInD
 					r = True
 
 			discrepancy = round((jsonStock - realStock) * lastPrice)
-			# TODO by now just hardcoding 50 USDT
-			BNBtolerability = 900
+			# TODO by now just hardcoding 50 USDT - bude to naviazane na sumukde skript kupuje bnb na poplatky
+			BNBtolerance = 900
 			if(coinName=='BNB'):
 				if (discrepancy > 0):
-					discrepancy = max(discrepancy - BNBtolerability, 0)
+					discrepancy = max(discrepancy - BNBtolerance, 0)
 				elif (discrepancy < 0):
-					discrepancy = min(discrepancy + BNBtolerability, 0)
+					discrepancy = min(discrepancy + BNBtolerance, 0)
 					
 			# if discrepancy a positive number -> more in json than in reality
 			if( discrepancy > tolerancyInDefCoin):

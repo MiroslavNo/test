@@ -38,13 +38,13 @@ def reconnect(SSIDs):
 	for SSID in SSIDs:
 		os.system('netsh wlan connect ssid="' + SSID + '" name="' + SSID + '"')
 		time.sleep(15)
-		if(hasInternet):
+		if(hasInternet()):
 			return True
 	# trying one more time
 	for SSID in SSIDs:
 		os.system('netsh wlan connect ssid="' + SSID + '" name="' + SSID + '"')
 		time.sleep(15)
-		if(hasInternet):
+		if(hasInternet()):
 			return True
 	return False
 
@@ -114,7 +114,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 						if(traderFunctions.diffRealAndExpectCoinStocks(clients[k], k)):
 							# TODO only in the testing phase, to prevent further damage
 							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
-							os.system('C:\Users\tagueri\Google Drive\crpt\bot\batch\02_STOP tradeRunner.bat')
+							os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
 			if(counter % counterCycleForBalanceUpdate == 0):
 				# TODO prerob v buducnu, aj tak getAccountsBalance bude treba viac zgeneralizovat
 				# nemal by si to mat takto, lebo to nechava otvoreny connection a po case dosiahne limit poctu pripojeni
@@ -126,7 +126,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 			restartBatPath = (traderFunctions.getScriptLocationPath(1) + r'\batch\03_RESTART tradeRunner.bat')
 			errMsgToBeSent = 'GUARDIAN - Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago.\n'
 
-			if ( hasInternet ):
+			if ( hasInternet() ):
 				# restart the programm - this bat will restart only the runner, NOT THE GUARDIAN
 				errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Internet is working, will try to restart the programm\n'
 				traderFunctions.ploggerErr (errMsgToBeSent)
@@ -144,7 +144,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 						
 					while (True):
 						time.sleep(sleepTimeInMin * 60)
-						if ( hasInternet ):
+						if ( hasInternet() ):
 							os.system('"' + restartBatPath + '"')
 							break
 
@@ -175,10 +175,11 @@ traderFunctions.checkTimeSyncErrAndLoop(clients['mno'], 20, 300)
 traderFunctions.ploggerInfo('GUARDIAN - START', True)
 # ensureBNBforFees at the beginning as well, because if trades happen at the very beggining
 ensureBNBforFees(clients['tibRick'], 50000)
+# TODO toto by malo ist na prvy krat do trade runnera (ked vrati false tak prerusit skript) a potom pri opakovackach by malo byt tuto v guardianovi
 if(traderFunctions.diffRealAndExpectCoinStocks(clients['tibRick'], 'tibRick')):
 	# TODO only in the testing phase, to prevent further damage
 	traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
-	os.system('C:\Users\tagueri\Google Drive\crpt\bot\batch\02_STOP tradeRunner.bat')
+	os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
 runGuardian(sharedPrefFileGuardian, guardian_loopTimeInMin)
 traderFunctions.ploggerErr ('ERROR - THE GUARDIAN HAS STOPPED')
 	

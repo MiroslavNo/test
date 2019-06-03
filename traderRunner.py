@@ -182,13 +182,14 @@ def trader_callbck(msg):
 	tmp = {}
 	# TODO_future malo by to tak fungovat lepsie, ze traderFunctions by si prerobil na classu a dictionary spolu s clientom by boli member variables - tym padom by si nemusel volat funkciu s parametrami, ale vzdy by si iba zavolal metodu trade na danom objecte 
 	for k, singleJsonDic in globalVariablesDictionary.items():
-		# kym som si neni isty chybami, tak zakomentujem try catch
-		#try:
-		r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], k, singleJsonDic, pricesFromTicker)
-		if not (r is None):
-			tmp[k] = r
-		#except Exception:
-		#	traderFunctions.ploggerErr('Following traceback error came from the strategy module:\n ' + traceback.format_exc())
+		try:
+			r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], singleJsonDic, pricesFromTicker)
+			if not (r is None):
+				tmp[k] = r
+		except Exception:
+			traderFunctions.ploggerErr('Following traceback error came from the strategy module:\n ' + traceback.format_exc())
+			# kym som si neni isty chybami, takradsej stompem skript
+			closeSocketAndRestartThisFile(False)
 
 	#Empty dictionaries evaluate to False in Python
 	if bool(tmp):

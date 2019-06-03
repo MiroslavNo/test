@@ -2,7 +2,6 @@
 #******	 EVERY STRATEGY HAS TO HAVE		******#
 #*********************************************#
 import traderFunctions
-import traceback
 
 # prefix "a_" stands for mandatory variables
 # prefix "u_" stands for variables which are updated before the start of the script, but ALSO MANDATORY
@@ -74,7 +73,7 @@ STEP_NR = 'step'
 DEBUG = True
 
 
-def trade(client, key, jD, pricesFromTicker, backTest=False):
+def trade(client, jD, pricesFromTicker):
 
 	# key stands for the name of the json
 	# jD stands for jsonDictionary
@@ -131,7 +130,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			if (stepDic[E_TYP]==LIMIT_BUY):
 				if DEBUG:
 					protocollFcionRun(UT_LIMIT_BUY, strLadderStep)
-				r = uTlimitBuy(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL])
+				r = uTlimitBuy(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_SENSITIVITY], jD[A_MAX_LOSS])
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==LIMIT_SELL):
@@ -166,7 +165,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			elif (stepDic[E_TYP]==LIMIT_SELL):
 				if DEBUG:
 					protocollFcionRun(LT_LIMIT_SELL, strLadderStep)
-				r = lTlimitSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL])
+				r = lTlimitSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_SENSITIVITY])
 				if not (r is None):
 					tmp[strLadderStep] = r
 			elif (stepDic[E_TYP]==WAIT_TO_BUY):
@@ -178,7 +177,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 			elif (stepDic[E_TYP]==WAIT_TO_SELL):
 				if DEBUG:
 					protocollFcionRun(LT_WAITTO_SELL, strLadderStep)
-				r = lTwaitToSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_CUMUL_LOSS_LIMIT])
+				r = lTwaitToSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_CUMUL_LOSS_LIMIT], jD[A_SENSITIVITY])
 				if not (r is None):
 					# the above if condition means that something happend
 					if bool(r):
@@ -224,7 +223,7 @@ def trade(client, key, jD, pricesFromTicker, backTest=False):
 		return None
 
 
-def uTlimitBuy(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol):
+def uTlimitBuy(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, sensitivity, maxLoss):
 	# cena za ktoru si chcel kupit - ak prekrocena, vytvoris market buy
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
 	marketOrderStats = client.order_market_buy(symbol=tradedSymbol, quantity=calcQty)
@@ -292,7 +291,7 @@ def lTlimitBuy(currPrice, stepDic):
 	
 	return stepDic
 
-def lTlimitSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol):
+def lTlimitSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, sensitivity):
 	# cena za ktoru si chcel predat - ak prekrocena, vytvoris market sell
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
 	marketOrderStats = client.order_market_sell(symbol=tradedSymbol, quantity=calcQty)
@@ -337,11 +336,20 @@ def lTwaitToBuy(currPrice, stepDic):
 	
 	return stepDic
 
-def lTwaitToSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, cumulLossLimit):
+def lTwaitToSell(client, currPrice, strLadderStep, stepDic, priceQtyReqs, tradedSymbol, cumulLossLimit, sensitivity):
+	if DEBUG:
+		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 1')
+		
 	# dosiahol si cenu ktora je ako keby taky stop loss po tom ako si vstupil do lTwaitToSell
 	calcQty = traderFunctions.validQty(priceQtyReqs, currPrice, stepDic[E_QTY])
+	if DEBUG:
+		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 2')
 	marketOrderStats = client.order_market_sell(symbol=tradedSymbol, quantity=calcQty)
+	if DEBUG:
+		traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 3')
 	if(marketOrderStats[STATUS] == client.ORDER_STATUS_FILLED):
+		if DEBUG:
+			traderFunctions.ploggerInfo(__name__ + ' / ' + tradedSymbol +  ' - lTwaitToSell - point 4')
 		fillQty = float(marketOrderStats[EXEC_QTY])
 		fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 		# calc gain (result is inkl. fees)
@@ -487,9 +495,9 @@ def calcGain(previousAvgXchange, currAvgXchange, direction ):
 		the order dependency of previousAvgXchange / currAvgXchange in relation to the direction has been tested
 	"""
 	if((direction == LIMIT_BUY) or (direction == WAIT_TO_BUY)):
-		return round(((previousAvgXchange / currAvgXchange) - 1) + previousLosses, 4)
+		return round(((previousAvgXchange / currAvgXchange) - 1), 4)
 	elif((direction == LIMIT_SELL) or (direction == WAIT_TO_SELL)):
-		return round(((currAvgXchange / previousAvgXchange) - 1) + previousLosses, 4)
+		return round(((currAvgXchange / previousAvgXchange) - 1), 4)
 	else:
 		traderFunctions.ploggerErr(__name__ + ' - ' + 'Unexpected direction in the fction calcCumulLoss: ' + direction)
 		return 0
@@ -497,7 +505,7 @@ def calcGain(previousAvgXchange, currAvgXchange, direction ):
 def protocollFcionRun(fname, strStepNr):
 	# for debug purposes
 	# can see which functions run, and the jD before and after (so the values as well) - this should be enough for investigation
-	traderFunctions.ploggerInfo(__name__ + ' / ' +  ' - ' + fname + ' called for the stepNr ' + strStepNr +', whole jD will follow')
+	traderFunctions.ploggerInfo(__name__ + '.' + fname + ' called for the stepNr ' + strStepNr +', whole jD will follow')
 	
 
 # without u_ vars - would require the client 
@@ -512,8 +520,8 @@ def startNewMarket(clientName, client, market, scriptLocationPath, mandatoryPara
 	strategyName = str(__name__).split('.')[-1:][0]
 	resultJsonFileName = '{}_{}_{}'.format(strategyName, market, clientName)
 	
-	if Path(scriptLocationPath + "\jsonTriggerFiles\\" + resultJsonFileName + '.json').is_file():
-		traderFunctions.ploggerErr(__name__ + '.startNewMarket - was supposed to create a starting trigger json with the path {} but detected that it already exists - ABORTING this creation'.format(scriptLocationPath + "\jsonTriggerFiles\\" + resultJsonFileName + '.json'))
+	if Path(scriptLocationPath + r'\jsonTriggerFiles\\' + resultJsonFileName + '.json').is_file():
+		traderFunctions.ploggerErr(__name__ + '.startNewMarket - was supposed to create a starting trigger json with the path {} but detected that it already exists - ABORTING this creation'.format(scriptLocationPath + r'\jsonTriggerFiles\\' + resultJsonFileName + '.json'))
 		return None
 
 	sharedPrefFileName = "pumpTheRightCoin_mandatoryParams_marketSpecific.json"
