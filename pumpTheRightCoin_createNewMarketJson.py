@@ -6,7 +6,16 @@ client=clients['tibRick']
 from strat import pumpTheRightCoin
 
 
-symbol = 'NEOUSDT'
+symbol = 'EOSUSDT'
+pumpTheRightCoin.startNewMarket('tibRick', client, symbol, traderFunctions.getScriptLocationPath(0))
+
+symbol = 'BTTUSDT'
+pumpTheRightCoin.startNewMarket('tibRick', client, symbol, traderFunctions.getScriptLocationPath(0))
+
+symbol = 'FETUSDT'
+pumpTheRightCoin.startNewMarket('tibRick', client, symbol, traderFunctions.getScriptLocationPath(0))
+
+symbol = 'HOTUSDT'
 pumpTheRightCoin.startNewMarket('tibRick', client, symbol, traderFunctions.getScriptLocationPath(0))
 
 

@@ -94,25 +94,28 @@ def trade(client, jD, pricesFromTicker):
 			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_NEXT_PRICE + '=' + str(jD[C_LADDER_NEXT_PRICE]) + ' was reached')
 		return createMarketOrderForNewLadderEntry( client, jD, price )
 		
-	if (jD[C_LADDER_HIGHEST_REACHED_STEP] <= 0 and price < jD[C_LADDER_BOTTOM_BOUNDARY]):
-		# ked je to cisto novy init
-		if(jD[C_LADDER_HIGHEST_REACHED_STEP] == 0):
-			# ked je to cisto novy init, tak posuvam hornu hranicu (A_SENSITIVITY) dole a vstupujem iba cez nu
-			nextPriceLevel_moved = price * (1 + jD[A_SENSITIVITY] + jD[A_MAX_LOSS])
-			if DEBUG:
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=0, ak iba nastavujem novy C_LADDER_NEXT_PRICE a C_LADDER_BOTTOM_BOUNDARY')
-			jD[C_LADDER_NEXT_PRICE] = nextPriceLevel_moved + ((jD[C_LADDER_NEXT_PRICE] - nextPriceLevel_moved ) / 2)
-			jD[C_LADDER_BOTTOM_BOUNDARY] = price
-			if DEBUG:
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' this is the whole jD:\n' + traderFunctions.formatDictForPrint(jD))
-			return jD
-		# ked je to opakovany init, tak vstupujem aj cez spodnu hranicu, HORNA HRANICA OSTAVA AKO PREDTYM
-		# nie je to sice sofistikovane, ale teoreticky, v pripade extremneho padu marketu, napr 50perc, by som tu spravil tych 25perc a pri najnizsej sume je pre vsetky coiny asi 2perc * 0,25 -> takze to necham asi tak ako to je
-		elif(jD[C_LADDER_HIGHEST_REACHED_STEP] == -1):
-			# POZN: skusal som radsej spravit jD update, ale kedze entries je nested, tak nevime update-nut aj nenestnute aj nestnute data v jednom kroku
-			if DEBUG:
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=-1, vytvorim novy init ladder order')
-			return createMarketOrderForNewLadderEntry( client, jD, price )
+	if (jD[C_LADDER_HIGHEST_REACHED_STEP] <= 0:
+		if price < jD[C_LADDER_BOTTOM_BOUNDARY]):
+			# ked je to cisto novy init
+			if(jD[C_LADDER_HIGHEST_REACHED_STEP] == 0):
+				# ked je to cisto novy init, tak posuvam hornu hranicu (A_SENSITIVITY) dole a vstupujem iba cez nu
+				nextPriceLevel_moved = price * (1 + jD[A_SENSITIVITY] + jD[A_MAX_LOSS])
+				if DEBUG:
+					traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=0, ak iba nastavujem novy C_LADDER_NEXT_PRICE a C_LADDER_BOTTOM_BOUNDARY')
+				jD[C_LADDER_NEXT_PRICE] = nextPriceLevel_moved + ((jD[C_LADDER_NEXT_PRICE] - nextPriceLevel_moved ) / 2)
+				jD[C_LADDER_BOTTOM_BOUNDARY] = price
+				if DEBUG:
+					traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' this is the whole jD:\n' + traderFunctions.formatDictForPrint(jD))
+				return jD
+			# ked je to opakovany init, tak vstupujem aj cez spodnu hranicu, HORNA HRANICA OSTAVA AKO PREDTYM
+			# nie je to sice sofistikovane, ale teoreticky, v pripade extremneho padu marketu, napr 50perc, by som tu spravil tych 25perc a pri najnizsej sume je pre vsetky coiny asi 2perc * 0,25 -> takze to necham asi tak ako to je
+			elif(jD[C_LADDER_HIGHEST_REACHED_STEP] == -1):
+				# POZN: skusal som radsej spravit jD update, ale kedze entries je nested, tak nevime update-nut aj nenestnute aj nestnute data v jednom kroku
+				if DEBUG:
+					traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_BOTTOM_BOUNDARY + '=' + str(jD[C_LADDER_BOTTOM_BOUNDARY]) + ' cena bola podlezena, kedze C_LADDER_HIGHEST_REACHED_STEP=-1, vytvorim novy init ladder order')
+				return createMarketOrderForNewLadderEntry( client, jD, price )
+		else:
+			return None
 					
 	############## KONIEC SPAWNERA ##############
 	
@@ -198,21 +201,24 @@ def trade(client, jD, pricesFromTicker):
 	
 	if bool(tmp):
 		jD[ENTRIES].update(tmp)
-		jD.update(updateSortedListsOfTresholds(jD))
 
 		for i in range(len(tmp_del)):
 			# the pop method removes an entry and the second arg is the default return val if entry not found - otherwise it returns the removed entry
 			removedEntry = jD["entries"].pop(tmp_del[i], None)
 			if(removedEntry is None):
-				traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + 'Tried to pop(remove) the entry with the STEP_NR:' + str(tmp_del[i]) + '(the value is of the type: ' + type(tmp_del[i]) + ') but received an error, that it wasnt found in the jD')
+				traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - Tried to pop(remove) the entry with the STEP_NR: ' + str(tmp_del[i]) + '(the value is of the type: ' + type(tmp_del[i]) + ') but received an error, that it wasnt found in the jD')
+			elif DEBUG:
+				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - entry with the STEP_NR: ' + str(tmp_del[i]) + ' has been removed')
 			# check if any entries left
 			if(len(jD["entries"].keys()) == 0):
-				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + 'ALL ENTRIES HAS BEEN DELETED, setting the ' + C_LADDER_HIGHEST_REACHED_STEP + ' to -1' )
+				traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ALL ENTRIES HAS BEEN DELETED, setting the ' + C_LADDER_HIGHEST_REACHED_STEP + ' to -1' )
 				jD[C_LADDER_HIGHEST_REACHED_STEP] = -1
 				# pri vymaze entry by mala byt nastavena spodna hranica na sumu znizenu o celkove percento ktore som prerobil
 				# POZOR E_CUMUL_LOSS je zaporna hodnota, preto tam je 1.0 +
 				jD[C_LADDER_BOTTOM_BOUNDARY] = price * ( 1.0 + (removedEntry.get(E_CUMUL_LOSS, (-2 * jD[A_MAX_LOSS]))))
 				# jD[C_LADDER_NEXT_PRICE] ostava tak isto ako bolo, lebo ked som prerobil na tom useku, tak tamuz nebudem vstupovat skor
+		
+		jD.update(updateSortedListsOfTresholds(jD))
 		
 		if DEBUG:
 			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' the price which triggered the changes above and the folllowing jD was: ' + str(price))
@@ -438,15 +444,18 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 def updateSortedListsOfTresholds(jD):
 	entries = jD.get(ENTRIES, {})
 	if not bool(entries):
-		traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' THIS WAS NOT SUPPOSED TO HAPPEN - no dictionary for entries found. Here is the whole jD:\n' + jD)
-		return jD
+		# the following value should also be set,if not,there is a discrepancy!: jD[C_LADDER_HIGHEST_REACHED_STEP] = -1
+		if (jD[C_LADDER_HIGHEST_REACHED_STEP]) != -1:
+			traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' AT LEAS 1 VALUE IN THE jD IS WRONG: no ladder entries found, but the value of ' + C_LADDER_HIGHEST_REACHED_STEP + ' is ' + jD[C_LADDER_HIGHEST_REACHED_STEP] + ' instead of the expeced -1. Here is the whole jD:\n' + jD)
+		# entries are empty, tht means the sorted lists will also be emptied. Note: a log msg regarding no entries was already written in the main loop
+		return{C_UTS_SORTED_ASC: [], C_LTS_SORTED_DESC: []}
 	
 	list_to_be_sorted = list()
 	for ladderStep, ladderStepDic in entries.items():
 		# TODO_future the C_UTS_SORTED_ASC could have only the uTs, and C_LTS_SORTED_DESC only lTs. Also maybe lists instead of dics would be faster
 		list_to_be_sorted.append({STEP_NR: ladderStep, E_LOWER_TRESHOLD: ladderStepDic[E_LOWER_TRESHOLD], E_UPPER_TRESHOLD: ladderStepDic[E_UPPER_TRESHOLD]})
 
-	return{C_UTS_SORTED_ASC: sorted(list_to_be_sorted, key=lambda k: k[E_UPPER_TRESHOLD]),	C_LTS_SORTED_DESC: sorted(list_to_be_sorted, key=lambda k: k[E_LOWER_TRESHOLD], reverse=True)}
+	return{C_UTS_SORTED_ASC: sorted(list_to_be_sorted, key=lambda k: k[E_UPPER_TRESHOLD]), C_LTS_SORTED_DESC: sorted(list_to_be_sorted, key=lambda k: k[E_LOWER_TRESHOLD], reverse=True)}
 	
 
 def calculateExchangePrice(lastXchangePrice, newPriceClimax, desiredDirection, startingTargetRatio=0.5, maxTargetRatio=0.8):
