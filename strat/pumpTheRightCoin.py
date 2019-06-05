@@ -94,8 +94,8 @@ def trade(client, jD, pricesFromTicker):
 			traderFunctions.ploggerInfo(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + C_LADDER_NEXT_PRICE + '=' + str(jD[C_LADDER_NEXT_PRICE]) + ' was reached')
 		return createMarketOrderForNewLadderEntry( client, jD, price )
 		
-	if (jD[C_LADDER_HIGHEST_REACHED_STEP] <= 0:
-		if price < jD[C_LADDER_BOTTOM_BOUNDARY]):
+	if (jD[C_LADDER_HIGHEST_REACHED_STEP] <= 0):
+		if (price < jD[C_LADDER_BOTTOM_BOUNDARY]):
 			# ked je to cisto novy init
 			if(jD[C_LADDER_HIGHEST_REACHED_STEP] == 0):
 				# ked je to cisto novy init, tak posuvam hornu hranicu (A_SENSITIVITY) dole a vstupujem iba cez nu
@@ -444,7 +444,7 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 def updateSortedListsOfTresholds(jD):
 	entries = jD.get(ENTRIES, {})
 	if not bool(entries):
-		# the following value should also be set,if not,there is a discrepancy!: jD[C_LADDER_HIGHEST_REACHED_STEP] = -1
+		# the following value should also be set,if not,there is a discrepancy!: jD[C_LADDER_HIGHEST_REACHED_STEP] = -1 . Pozn: pri hodnote 0 tam ten entry stale je, a aj ma byt
 		if (jD[C_LADDER_HIGHEST_REACHED_STEP]) != -1:
 			traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' AT LEAS 1 VALUE IN THE jD IS WRONG: no ladder entries found, but the value of ' + C_LADDER_HIGHEST_REACHED_STEP + ' is ' + jD[C_LADDER_HIGHEST_REACHED_STEP] + ' instead of the expeced -1. Here is the whole jD:\n' + jD)
 		# entries are empty, tht means the sorted lists will also be emptied. Note: a log msg regarding no entries was already written in the main loop

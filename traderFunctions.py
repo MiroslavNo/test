@@ -604,8 +604,9 @@ def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInD
 			lastXchangePrice = 0
 			
 			for stepNr, entry in entries.items():
-				totalStock_json = totalStock_json + entry['qty']
-				# lastXchangePrice = entry['lastXchangePrice']
+				if(entry['typ'] in ['waitToSell', 'limitSell']):
+					totalStock_json = totalStock_json + entry['qty']
+					# lastXchangePrice = entry['lastXchangePrice']
 			
 			jsonStocks[coin] = totalStock_json
 	realStocks = getCoinStocs(client, defCoin, True)
