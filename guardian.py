@@ -137,19 +137,19 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 			traderFunctions.ploggerInfo('ensureBNBforFees - creating a market order for ' + str(calcQty_inBNB) + ' BNBs')
 			client.order_market_buy(symbol=BNBUSDT, quantity=calcQty_inBNB)
 
-def getAccountsBalance(fileName):
-	htmlBalanceFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs' + '\\' + fileName
+def getAccountsBalance(clientName):
+	htmlBalanceFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs\report_' + clientName + '.html'
 	htmlFile = open(htmlBalanceFilePath, 'r')
 	htmlContent = htmlFile.read()
 	htmlFile.close()
 
 	lastRunDate = htmlContent[13:19]
 	# GET BALANCES
-	tibRick_BTC = traderFunctions.getAccoutBalances(clients['tibRick'], 'BTC', 0.001, False)
+	tibRick_BTC = traderFunctions.getAccoutBalances(clients[clientName], 'BTC', 0.001, False)
 	mno_BTC = traderFunctions.getAccoutBalances(clients['mno'], 'BTC', 0.001, False)
 	
-	btcUsdtPrice = traderFunctions.getLastPrice(clients['tibRick'], 'BTC', 'USDT')
-	bnbBtcPrice = traderFunctions.getLastPrice(clients['tibRick'], 'BNB', 'BTC')
+	btcUsdtPrice = traderFunctions.getLastPrice(clients[clientName], 'BTC', 'USDT')
+	bnbBtcPrice = traderFunctions.getLastPrice(clients[clientName], 'BNB', 'BTC')
 	
 	sumBalances = Counter(tibRick_BTC) + Counter(mno_BTC)
 
@@ -245,7 +245,10 @@ def runGuardian():
 							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 							os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
 			if(counter % counterCycleForBalanceUpdate == 0):
-				getAccountsBalance('report.html')
+				for k, client in clients.items():
+					# TODO_future the report now is suitable only for tibRick
+					if (k !=  'mno'):
+						getAccountsBalance(k)
 		else:
 			# resetting the counter just to be sure the wont be interference between get BNB or get BALANCE
 			counter=0
