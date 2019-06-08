@@ -67,7 +67,7 @@ def ploggerWarn(msg, sendEmail=True):
 	errorLogger.warn(WARN[3:] + msg)
 	infoLogger.info(WARN[3:] + msg)
 	if(sendEmail):
-		if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
+		if not ( checkIfLastTimeOfThisEventWasLately(sharedPrefFileLastEmail, 3600) ):
 			send_email('TRADER - Logger WARN', msg)
 			writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
 
@@ -76,7 +76,7 @@ def ploggerErr(msg):
 	print(str(datetime.datetime.now().strftime(TIMESTAMP_FORMAT)) + ERR + msg)
 	errorLogger.error(ERR[3:] + msg)
 	infoLogger.info(ERR[3:] + msg)
-	if not ( checkIfLastTimeOfThisEvenWasLately(sharedPrefFileLastEmail, 3600) ):
+	if not ( checkIfLastTimeOfThisEventWasLately(sharedPrefFileLastEmail, 3600) ):
 		send_email('TRADER - Logger ERR', msg)
 		writeEventTimeInSharedPrefs(sharedPrefFileLastEmail)
 
@@ -438,7 +438,7 @@ def send_email(subject, msg):
 		ploggerWarn('Could not send the email out', False)
 
 ################  Check Last Occurence ################
-def checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, timeLimitInSec):
+def checkIfLastTimeOfThisEventWasLately(sharedPrefFileName, timeLimitInSec):
 	sharedPrefFileLocation = r"sharedPrefs\\" + sharedPrefFileName + '.json'
 	# DEBUG
 	# ploggerInfo('Testing if event in the file ' + sharedPrefFileName + ' was less than ' + str(timeLimitInSec) + ' seconds ago' )

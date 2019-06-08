@@ -36,15 +36,15 @@ def hasInternet(host="8.8.8.8", port=53, timeout=3):
   except Exception as ex:
     return False
 
-def loopWhileNoInternet(sleepTimeInMin):
+def loopWhileNoInternet():
 	while (True):
-		time.sleep(sleepTimeInMin * 60)
+		time.sleep(guardian_loopTimeInMin * 60)
 		if ( hasInternet() ):
-			ploggerInfo('internet connection working -> restarting with command {}'.format(restartBatCmd))
+			traderFunctions.ploggerInfo('internet connection working -> restarting with command {}'.format(restartBatCmd))
 			os.system(restartBatCmd)
 			break
 		else:
-			ploggerWarn('still no internet, waiting for another {} minutes'.format(str(sleepTimeInMin)), False)
+			traderFunctions.ploggerWarn('still no internet, waiting for another {} minutes'.format(str(guardian_loopTimeInMin)), False)
 
 # TODO mozno budes musiet odstranit, ked PC nebude mat wifi kartu
 def reconnect(SSIDs):
@@ -69,13 +69,13 @@ def reconnectAndLoopWhileNoInternet():
 		traderFunctions.ploggerErr (errMsgToBeSent)
 		os.system(restartBatCmd)
 	else:
-		errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect was not working, will check every ' + str(sleepTimeInMin) + ' minutes, and if there will be connection, will restart the runner'
+		errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect was not working, will check every ' + str(guardian_loopTimeInMin) + ' minutes, and if there will be connection, will restart the runner'
 		# aj ked nie je internet, nepotrebujem try catch, lebo the je uz v metode, ktora posiela maily
 		try:
 			traderFunctions.ploggerErr (errMsgToBeSent)
 		except:
 			pass
-		loopWhileNoInternet(sleepTimeInMin, restartBatCmd)
+		loopWhileNoInternet()
 
 def writeTimeIntoReportHTML():
 	htmlFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs\report.html'
@@ -122,16 +122,16 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 			traderFunctions.ploggerInfo('ensureBNBforFees - creating a market order for ' + str(calcQty_inBNB) + ' BNBs')
 			client.order_market_buy(symbol=BNBUSDT, quantity=calcQty_inBNB)
 
-def runGuardian(sharedPrefFileName, sleepTimeInMin):
+def runGuardian(sharedPrefFileName):
 	counter=0
-	counterCycleForBNBUpdate = round (bnbUpdate_loopTimeInMin / sleepTimeInMin)
-	counterCycleForBalanceUpdate = round (balanceUpdate_loopTimeInMin / sleepTimeInMin)
+	counterCycleForBNBUpdate = round (bnbUpdate_loopTimeInMin / guardian_loopTimeInMin)
+	counterCycleForBalanceUpdate = round (balanceUpdate_loopTimeInMin / guardian_loopTimeInMin)
 	
 	while (True):
-		time.sleep(sleepTimeInMin * 60)
+		time.sleep(guardian_loopTimeInMin * 60)
 		traderFunctions.ploggerInfo('GUARDIAN - checking if websocket alive', True)
 		
-		if ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileName, int(round(sleepTimeInMin*60))) ):
+		if ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileName, int(round(guardian_loopTimeInMin*60))) ):
 			# confirm that everything OK
 			writeTimeIntoReportHTML()
 			counter=+1
@@ -155,7 +155,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 
 			if ( hasInternet() ):
 				# restart the programm - this bat will restart only the runner, NOT THE GUARDIAN
-				traderFunctions.ploggerErr ('GUARDIAN - Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago.\nInternet is working, will try to restart the programm')
+				traderFunctions.ploggerErr ('GUARDIAN - Trader not running, Last registered Clbk was more than ' + str(guardian_loopTimeInMin) + ' minutes ago.\nInternet is working, will try to restart the programm')
 				os.system(restartBatCmd)
 			else:
 				reconnectAndLoopWhileNoInternet()
@@ -182,6 +182,6 @@ if(traderFunctions.diffRealAndExpectCoinStocks(clients['tibRick'], 'tibRick')):
 	# TODO only in the testing phase, to prevent further damage
 	traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 	os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
-runGuardian(sharedPrefFileGuardian, guardian_loopTimeInMin)
+runGuardian(sharedPrefFileGuardian)
 traderFunctions.ploggerErr ('ERROR - THE GUARDIAN HAS STOPPED')
 	

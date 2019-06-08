@@ -170,7 +170,7 @@ def trader_callbck(msg):
 		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
 		# commenting some bits out because clogging the log
-		if not ( traderFunctions.checkIfLastTimeOfThisEvenWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
+		if not ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
 			# traderFunctions.ploggerInfo('Warn - Websocket - SKIPPING this clbk msg', False)
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
