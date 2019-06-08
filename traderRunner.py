@@ -87,11 +87,11 @@ def checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, c
 
 def printFirstClbkOccurence(startTimeInSec):
 	while(True):
-		print('MNO TEST - should stopp after first msg')
 		if ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileGuardian, time.time() - startTimeInSec )):
 			print('INFO - First clbk message processed')
 			break
 		else:
+			print('INFO - First clbk message NOT YET processed')
 			time.sleep(5)
 			
 def closeSocketAndRestartThisFile(boolRestart):
@@ -154,6 +154,8 @@ def getTimeFromClbkMsg(msg):
 ######################################################
 def trader_callbck(msg):
 	global globalVariablesDictionary
+	global nextTimeForGuardianReport
+	global nextTimeForFlagCheck
 
 	if (type(msg) == 'dict'):
 		traderFunctions.ploggerErr('The message from the websocket is a dictionary, but should be a list - maybe an error appeared')
@@ -200,15 +202,13 @@ def trader_callbck(msg):
 		updateJsons(tmp)
 	
 	if ( nextTimeForGuardianReport < currTimeInSec ):
-		global nextTimeForGuardianReport
 		traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
-		nextTimeForGuardianReport = nextTimeForGuardianReport + guardian_loopTimeInSec
+		nextTimeForGuardianReport = currTimeInSec + guardian_loopTimeInSec
 	
 	# running the check for stopping the script every 90s
 	if ( nextTimeForFlagCheck < currTimeInSec ):
-		global nextTimeForFlagCheck
 		stopIfFlag(stopFlagFileName)
-		nextTimeForFlagCheck = nextTimeForFlagCheck + 90
+		nextTimeForFlagCheck = currTimeInSec + 90
 
 ######################################################
 #############		WEBSOCKET			##############
@@ -253,8 +253,6 @@ traderFunctions.updateJsonTriggerFiles('u_singleEntryAmounts', traderFunctions.g
 globalVariablesDictionary = traderFunctions.loadAllInitJsons(mandatoryInitVars)
 globalVariablesDictionary = checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, clients)
 logJsonsWhichWillRun(globalVariablesDictionary)
-# write the epoch time for the independent check, if the script is running
-traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 
 # TODO following checks for pumpTheRightCoin before startup:
 # 1, grouping of close entries in the jsons
