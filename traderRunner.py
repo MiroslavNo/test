@@ -145,7 +145,7 @@ def getTimeFromClbkMsg(msg):
 def trader_callbck(msg):
 	global globalVariablesDictionary
 	global clbkCounterForGuardian
-	
+
 	# musi byt tu, lebo inak pri skippovani nezarata tento loop
 	clbkCounterForGuardian -= 1
 

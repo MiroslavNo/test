@@ -1,5 +1,6 @@
 import traderFunctions
 import time
+import datetime
 import re
 import socket
 import os
@@ -15,6 +16,8 @@ guardian_loopTimeInMin = (traderFunctions.getValFromSharedPrefFile(fileWithLoopT
 bnbUpdate_loopTimeInMin = (traderFunctions.getValFromSharedPrefFile(fileWithLoopTimesForGuardian, 'bnbUpdate_loopTimeInMin'))
 balanceUpdate_loopTimeInMin = (traderFunctions.getValFromSharedPrefFile(fileWithLoopTimesForGuardian, 'balanceUpdate_loopTimeInMin'))
 
+restartBatPath = (traderFunctions.getScriptLocationPath(1) + r'\batch\03_RESTART tradeRunner.bat')
+restartBatCmd = 'start cmd /k "' + restartBatPath + '" ' + str(datetime.datetime.now().strftime("%Y%d%m_%H%M"))
 
 ######################################################
 #############		FUNCTIONS			##############
@@ -33,6 +36,17 @@ def hasInternet(host="8.8.8.8", port=53, timeout=3):
   except Exception as ex:
     return False
 
+def loopWhileNoInternet(sleepTimeInMin):
+	while (True):
+		time.sleep(sleepTimeInMin * 60)
+		if ( hasInternet() ):
+			ploggerInfo('internet connection working -> restarting with command {}'.format(restartBatCmd))
+			os.system(restartBatCmd)
+			break
+		else:
+			ploggerWarn('still no internet, waiting for another {} minutes'.format(str(sleepTimeInMin)), False)
+
+# TODO mozno budes musiet odstranit, ked PC nebude mat wifi kartu
 def reconnect(SSIDs):
 	# a call of this function looks like: reconnect(['KDG-DDEBE', 'FRITZ!Box 7490'])
 	for SSID in SSIDs:
@@ -47,6 +61,21 @@ def reconnect(SSIDs):
 		if(hasInternet()):
 			return True
 	return False
+
+def reconnectAndLoopWhileNoInternet():
+	errMsgToBeSent = 'GUARDIAN - Internet is NOT working, will try to reconnect to the wifi\n'
+	if(reconnect(['KDG-DDEBE', 'FRITZ!Box 7490'])):
+		errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect successful, will try to restart the programm\n'
+		traderFunctions.ploggerErr (errMsgToBeSent)
+		os.system(restartBatCmd)
+	else:
+		errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect was not working, will check every ' + str(sleepTimeInMin) + ' minutes, and if there will be connection, will restart the runner'
+		# aj ked nie je internet, nepotrebujem try catch, lebo the je uz v metode, ktora posiela maily
+		try:
+			traderFunctions.ploggerErr (errMsgToBeSent)
+		except:
+			pass
+		loopWhileNoInternet(sleepTimeInMin, restartBatCmd)
 
 def writeTimeIntoReportHTML():
 	htmlFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs\report.html'
@@ -113,6 +142,7 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 						ensureBNBforFees(client, 50000)
 						if(traderFunctions.diffRealAndExpectCoinStocks(clients[k], k)):
 							# TODO only in the testing phase, to prevent further damage
+							# TODO neskor to asi odstran, elbo by sa mohlo stat ze akurat medzi json a skutocnostou prebehne nejaky sell, v podstate mas v tej metode aj logovanie, takze by stacilo keby si to zavola bez if
 							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 							os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
 			if(counter % counterCycleForBalanceUpdate == 0):
@@ -122,31 +152,13 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 		else:
 			# resetting the counter just to be sure the wont be interference between get BNB or get BALANCE
 			counter=0
-			#getting the path for the restart batch
-			restartBatPath = (traderFunctions.getScriptLocationPath(1) + r'\batch\03_RESTART tradeRunner.bat')
-			errMsgToBeSent = 'GUARDIAN - Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago.\n'
 
 			if ( hasInternet() ):
 				# restart the programm - this bat will restart only the runner, NOT THE GUARDIAN
-				errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Internet is working, will try to restart the programm\n'
-				traderFunctions.ploggerErr (errMsgToBeSent)
-				os.system('"' + restartBatPath + '"')
+				traderFunctions.ploggerErr ('GUARDIAN - Trader not running, Last registered Clbk was more than ' + str(sleepTimeInMin) + ' minutes ago.\nInternet is working, will try to restart the programm')
+				os.system(restartBatCmd)
 			else:
-				errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Internet is NOT working, will try to reconnect to the wifi\n'
-				if(reconnect(['KDG-DDEBE', 'FRITZ!Box 7490'])):
-					errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect successful, will try to restart the programm\n'
-					traderFunctions.ploggerErr (errMsgToBeSent)
-					os.system('"' + restartBatPath + '"')
-				else:
-					errMsgToBeSent = errMsgToBeSent + 'GUARDIAN - Reconnect was not working, will check every ' + str(sleepTimeInMin) + ' minutes, and if there will be connection, will restart the runner'
-					# aj ked nie je internet, nepotrebujem try catch, lebo the je uz v metode, ktora posiela maily
-					traderFunctions.ploggerErr (errMsgToBeSent)
-						
-					while (True):
-						time.sleep(sleepTimeInMin * 60)
-						if ( hasInternet() ):
-							os.system('"' + restartBatPath + '"')
-							break
+				reconnectAndLoopWhileNoInternet()
 
 
 
@@ -155,21 +167,11 @@ def runGuardian(sharedPrefFileName, sleepTimeInMin):
 #############				MAIN		##############
 ######################################################	
 
-# TODO - tento main je mysleny tak, ze ked buem vediet restartovat PC, kym to vsak nerobim, staci uplne obycajny call na guardina
-##############################	MAIN	####################################
-# if(hasInternet()):
-# 	runGuardian(sharedPrefFileGuardian, guardian_loopTimeInMin)
-# else:
-# 	if(reconnect(['KDG-DDEBE', 'FRITZ!Box 7490'])):
-# 		runGuardian(sharedPrefFileGuardian, guardian_loopTimeInMin)
-# 	else:
-# 		try:
-# 			traderFunctions.ploggerErr ('GUARDIAN - NO INTERNET')
-# 		except:
-# 			# just because of the err coming from unsuccesful email
-# 			pass
-
 # pre checks
+# note: in the runner no internet check is needed, if no internet the runner will crash -> the idea is to handle the situation in the runner and once there is internet the runner will be restarted. Also, as it is trying to reconnect, internet should be checked only from 1 place
+if not hasInternet():
+	reconnectAndLoopWhileNoInternet()
+	
 traderFunctions.checkExchangeStatus(clients['mno'])
 traderFunctions.checkTimeSyncErrAndLoop(clients['mno'], 20, 300)
 traderFunctions.ploggerInfo('GUARDIAN - START', True)

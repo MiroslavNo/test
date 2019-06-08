@@ -105,13 +105,15 @@ def addClients():
 	
 #################  CHECK EXCHANGE STATUS ################
 def checkExchangeStatus(client_curr):
+	sleepInMin=10
 	#check the exchange status (0=OK, 1=MAINTANENCE)
 	status = client_curr.get_system_status()
-	if status.get('status', 'Key Not Found')==1:
-		ploggerWarn('BINANCE IS UNDER MAINTANENCE (SYSTEM_STATUS = 1) - will try in 30 minutes again')
-		#wait 30 mins
-		time.sleep(30 * 60)
-		checkExchangeStatus(client_curr)
+	while(status.get('status', 'Key Not Found')==1):
+		#if status.get('status', 'Key Not Found')==1:
+		ploggerWarn('BINANCE IS UNDER MAINTANENCE (SYSTEM_STATUS = 1) - will try in {} minutes again'.format(str(sleepInMin)))
+		#wait
+		time.sleep(sleepInMin * 60)
+		status = client_curr.get_system_status()
 	
 #################  CHECK TIME SYNC ERR ################
 def checkTimeSyncErrAndLoop(client_curr, maxNrOfLoops, sleepInSec):
@@ -222,6 +224,16 @@ def convertEpochToTimestamp(ts_epoch, epochInMiliseconds=True, format='%Y-%m-%d 
 		timeInt = int(ts_epoch)
 	ts = datetime.datetime.fromtimestamp(timeInt).strftime(format)
 	return ts
+
+def convertTimestampToEpoch(timestamp_str, epochInMiliseconds=True, timeStampFormat='%Y%m%d%H%M'):
+	# for the timeStampFormat="%Y%m%d%H%M" a call would look like: convertTimestampToEpoch('201906071000', False)
+	utc_time = datetime.datetime.strptime(timestamp_str, timeStampFormat)
+	epoch_time = (utc_time - datetime.datetime(1970, 1, 1)).total_seconds()
+	if (epochInMiliseconds):
+		epoch_time = epoch_time * 1000
+
+	return epoch_time
+
 
 #################  PART OF THE GUARDIAN FUNCTIONALITY ################
 def setclbkCounterForGuardian(loopingTimeInMin):
@@ -600,15 +612,15 @@ def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInD
 				ploggerWarn('diffRealAndExpectCoinStocks - a NON-USDT market was found in the int jsons - this was not expected!', False)
 
 			entries = intiJson['entries']
-			totalStock_json = 0
+			totalStock_json_SellPositions = 0
 			lastXchangePrice = 0
 			
 			for stepNr, entry in entries.items():
 				if(entry['typ'] in ['waitToSell', 'limitSell']):
-					totalStock_json = totalStock_json + entry['qty']
+					totalStock_json_SellPositions = totalStock_json_SellPositions + entry['qty']
 					# lastXchangePrice = entry['lastXchangePrice']
 			
-			jsonStocks[coin] = totalStock_json
+			jsonStocks[coin] = totalStock_json_SellPositions
 	realStocks = getCoinStocs(client, defCoin, True)
 	
 	for coinName, realStock in realStocks.items():
