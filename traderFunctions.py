@@ -105,7 +105,7 @@ def addClients():
 	
 #################  CHECK EXCHANGE STATUS ################
 def checkExchangeStatus(client_curr):
-	sleepInMin=10
+	sleepInMin=15
 	#check the exchange status (0=OK, 1=MAINTANENCE)
 	status = client_curr.get_system_status()
 	while(status.get('status', 'Key Not Found')==1):

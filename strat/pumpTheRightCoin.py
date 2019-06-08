@@ -421,6 +421,7 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 		fillPrice = float(marketOrderStats[CUMUL_QTY]) / fillQty
 		# update dics
 		jD[C_LADDER_HIGHEST_REACHED_STEP] = ladderHighestReachedStep	
+		diff_TriggPriceVsExecPrice = calcGain( jD[C_LADDER_NEXT_PRICE], fillPrice, LIMIT_BUY )
 		jD[C_LADDER_NEXT_PRICE] = fillPrice * (1.0 + jD[A_SENSITIVITY])
 		jD[ENTRIES][str(ladderHighestReachedStep)] = {E_TYP: WAIT_TO_SELL,
 														E_QTY: fillQty,
@@ -429,7 +430,7 @@ def createMarketOrderForNewLadderEntry( client, jD, priceFromTicker ):
 														E_LOWER_TRESHOLD: fillPrice * (1.0 - jD[A_MAX_LOSS]),
 														E_CUMUL_LOSS: 0.0
 													}
-		traderFunctions.ploggerTrades(jD[A_SYMBOL], ladderHighestReachedStep, 'NEW_ENTRY', fillPrice, 0, 0, fillQty)
+		traderFunctions.ploggerTrades(jD[A_SYMBOL], ladderHighestReachedStep, 'NEW_ENTRY', fillPrice, diff_TriggPriceVsExecPrice, 0, fillQty)
 		jD.update(updateSortedListsOfTresholds(jD))
 	else:
 		traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' unexpected situation, the market order had a different status then ' + client.ORDER_STATUS_FILLED + '. Here is the whole response:\n' + marketOrderStats)
