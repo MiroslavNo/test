@@ -176,7 +176,7 @@ def trader_callbck(msg):
 	# skip if time difference is bigger than 2sec (2000 mSec) - since it can happen, that my clbk processing will be slower than the interval of the clbks (1 sec)
 	currTimeInSec = time.time()
 	if( (1000 * currTimeInSec - timeFromClbkMsg) > 1750 ):
-		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * currTimeInSec - timeFromClbkMsg) + ' miliSec', False)
+		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * currTimeInSec - timeFromClbkMsg) + ' miliSec', True)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
 		if not ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
