@@ -4,6 +4,7 @@ import datetime
 import re
 import socket
 import os
+from collections import Counter
 
 # musi byt, lebo niektore metody z traderFunctions maju implementovany logging
 traderFunctions.startLoggers()
@@ -136,6 +137,90 @@ def ensureBNBforFees(client, amountOfFundsInUSDT):
 			traderFunctions.ploggerInfo('ensureBNBforFees - creating a market order for ' + str(calcQty_inBNB) + ' BNBs')
 			client.order_market_buy(symbol=BNBUSDT, quantity=calcQty_inBNB)
 
+def getAccountsBalance(fileName):
+	htmlBalanceFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs' + '\\' + fileName
+	htmlFile = open(htmlBalanceFilePath, 'r')
+	htmlContent = htmlFile.read()
+	htmlFile.close()
+
+	lastRunDate = htmlContent[13:19]
+	# GET BALANCES
+	tibRick_BTC = traderFunctions.getAccoutBalances(clients['tibRick'], 'BTC', 0.001, False)
+	mno_BTC = traderFunctions.getAccoutBalances(clients['mno'], 'BTC', 0.001, False)
+	
+	btcUsdtPrice = traderFunctions.getLastPrice(clients['tibRick'], 'BTC', 'USDT')
+	bnbBtcPrice = traderFunctions.getLastPrice(clients['tibRick'], 'BNB', 'BTC')
+	
+	sumBalances = Counter(tibRick_BTC) + Counter(mno_BTC)
+
+	total_BTC = float(sumBalances.get('total'))
+	total_USDT = round(total_BTC * btcUsdtPrice)
+	total_BTC_tibRick = float(tibRick_BTC.get('total'))
+	total_BNB_mno = float(mno_BTC.get('total')) / bnbBtcPrice
+
+	# CALCULATE THE REST
+	# calculateInterest
+	EURUSD = 1.14
+	vlozenePeniaze = 114199.0
+	vlozenePeniaze_pozicane = 20500 + 24000 + 22000
+	urokDenny = 460/30
+	zaciatokPocitaniaUroku = datetime.date(2018, 5, 1)
+	pocetDni = int(str(datetime.date.today() - zaciatokPocitaniaUroku)[0:3])
+	urok = float(pocetDni) * urokDenny
+	spoluPozicane = vlozenePeniaze_pozicane + urok
+	spoluVlozene = vlozenePeniaze + urok
+	spoluPozicane_USD = round(spoluPozicane * EURUSD, -2)
+	spoluVlozene_USD = round(spoluVlozene * EURUSD, -2)
+
+	runToday = False
+	# testing if already run today
+	if (lastRunDate == time.strftime("%d.%m.")):
+		runToday = True
+		regex = re.compile("\['" + time.strftime("%d.%m") + "', .*\n")
+		htmlContent = re.sub(regex, '', htmlContent)
+	
+	lineBreak = '\n'
+
+	#replace time
+	plchldr = 'Report from: '
+	#timePlchldr_end = '</p></b>'
+	regex = re.compile("Report from: .*")
+	htmlContent = re.sub(regex, plchldr + time.strftime("%d.%m.%Y %H:%M:%S"), htmlContent)
+
+	#replace Investovane / Pozicane
+	plchldr = '<br><b>I/P:</b><br>'
+	regex = re.compile(plchldr + ".*")
+	htmlContent = re.sub(regex, plchldr + str(round(spoluVlozene_USD / 1000, 1)) + ' / ' + str(round(spoluPozicane_USD / 1000, 1)), htmlContent)
+
+	#extend USD chart
+	plchldr = '//$$DATACHART_USD$$'
+	htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_USDT, -2)) + "]," + lineBreak + plchldr)
+
+	#extend BTC_tibRick chart
+	plchldr = '//$$DATACHART_BTC_tibRick$$'
+	htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_BTC_tibRick, 2)) + "]," + lineBreak + plchldr)
+
+	#extend BNB_mno chart
+	plchldr = '//$$DATACHART_BNB_mno$$'
+	htmlContent = htmlContent.replace(plchldr, "['" + time.strftime("%d.%m") + "', " + str(round(total_BNB_mno, 0)) + "]," + lineBreak + plchldr)
+	
+	#portfolio chart data
+	portfolioChartData = 'USDT' + "', " + str(round(sumBalances.get('USDT') * btcUsdtPrice, 0)) + ", '" + str(int(round(sumBalances.get('USDT') / sumBalances.get('total') , 0) * 100)) + "%' ],['"
+	for key, item in sorted(sumBalances.items()):
+		if not key in ['total', 'USDT']:
+			portfolioChartData = portfolioChartData + key + "', " + str(round(sumBalances.get(key) * btcUsdtPrice, 0)) + ", '" + str(int(round(sumBalances.get(key) / sumBalances.get('total'), 0) * 100)) + "%' ],['"
+
+	plchldr_begin = "var data_Portfolio = google"
+	plchldr_end = "]);"
+	regexPlchldr = re.compile(plchldr_begin + ".*")
+	plchldr_begin = plchldr_begin + r".visualization.arrayToDataTable([['Element', 'ValInUSD', { role: 'annotation' } ],['"
+	htmlContent = re.sub(regexPlchldr, plchldr_begin + portfolioChartData[:-3] + plchldr_end, htmlContent)
+
+	#write the output
+	htmlFile = open(htmlBalanceFilePath, 'w')
+	htmlFile.write(htmlContent)
+	htmlFile.close()
+
 def runGuardian():
 	counter=0
 	counterCycleForBNBUpdate = round (bnbUpdate_loopTimeInMin / guardian_loopTimeInMin)
@@ -160,9 +245,7 @@ def runGuardian():
 							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 							os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
 			if(counter % counterCycleForBalanceUpdate == 0):
-				# TODO prerob v buducnu, aj tak getAccountsBalance bude treba viac zgeneralizovat
-				# nemal by si to mat takto, lebo to nechava otvoreny connection a po case dosiahne limit poctu pripojeni
-				os.system('getAccountsBalance.py')
+				getAccountsBalance('report.html')
 		else:
 			# resetting the counter just to be sure the wont be interference between get BNB or get BALANCE
 			counter=0

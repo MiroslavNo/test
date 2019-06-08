@@ -126,6 +126,7 @@ def trade(client, jD, pricesFromTicker):
 	list_lTs_sortDesc = jD[C_LTS_SORTED_DESC]
 	
 	# TODO_future pri niektorych fciach by si teoreticky nepotreboval if not (r is None):, lebo oni vzdy vracaju nieco, treba ale preverit casom, ked si budem isty a nebudem zabudovavat napr return None
+	# TODO_future porozmyslaj ci by si nechcel spravit iba jednu zmenu v jednom loope, ez poo tych fciach kde sa predava alebo kupuje by si dal break
 	for i in range(len(list_uTs_sortAsc)):
 		if (price > list_uTs_sortAsc[i][E_UPPER_TRESHOLD]):
 			strLadderStep = str(list_uTs_sortAsc[i][STEP_NR])
