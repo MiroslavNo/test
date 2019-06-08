@@ -21,13 +21,14 @@ traderFunctions.startLoggers()
 ######################################################
 strats = {}
 mandatoryInitVars = {}
-sharedPrefFileGuardian = 'guardian_lastClbkTime'
-fileWithLoopTimesForGuardian = 'guardian_loopTimeInMin.json'
-guardian_loopTimeInMin = (traderFunctions.getValFromSharedPrefFile(fileWithLoopTimesForGuardian, 'guardian_loopTimeInMin'))
 sharedPrefFileSkipClbkMsgDueDelay = 'lastTimeAClbkMsgWasSkipepd'
 stopFlagFileName = 'runnerSTOPFlag_anyContentWillStop.txt'
+sharedPrefFileGuardian = 'guardian_lastClbkTime'
+# 1,25 je bezpecnostny koef
+guardian_loopTimeInSec = int(round((traderFunctions.getValFromSharedPrefFile('guardian_loopTimeInMin.json', 'guardian_loopTimeInMin')) * 60 / 1.25))
 # pociatocna hodnota, hned pri prvom loope sa potom nastavi na spravnu
-clbkCounterForGuardian = 0
+nextTimeForGuardianReport = 0
+nextTimeForFlagCheck = 0
 scriptLocationPath = traderFunctions.getScriptLocationPath(0)
 
 
@@ -83,7 +84,16 @@ def checkIfStratAndClientFromEveryJsonExist(globalVariablesDictionary, strats, c
 		del globalVariablesDictionary[k]
 	
 	return globalVariablesDictionary
-	
+
+def printFirstClbkOccurence(startTimeInSec):
+	while(True):
+		print('MNO TEST - should stopp after first msg')
+		if ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileGuardian, time.time() - startTimeInSec )):
+			print('INFO - First clbk message processed')
+			break
+		else:
+			time.sleep(5)
+			
 def closeSocketAndRestartThisFile(boolRestart):
 	traderFunctions.ploggerWarn('Closing the socket', False)
 	bm.close()	
@@ -144,10 +154,6 @@ def getTimeFromClbkMsg(msg):
 ######################################################
 def trader_callbck(msg):
 	global globalVariablesDictionary
-	global clbkCounterForGuardian
-
-	# musi byt tu, lebo inak pri skippovani nezarata tento loop
-	clbkCounterForGuardian -= 1
 
 	if (type(msg) == 'dict'):
 		traderFunctions.ploggerErr('The message from the websocket is a dictionary, but should be a list - maybe an error appeared')
@@ -166,16 +172,13 @@ def trader_callbck(msg):
 		return
 	
 	# skip if time difference is bigger than 2sec (2000 mSec) - since it can happen, that my clbk processing will be slower than the interval of the clbks (1 sec)
-	if( (1000 * time.time() - timeFromClbkMsg) > 1750 ):
-		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * time.time() - timeFromClbkMsg) + ' miliSec', False)
+	currTimeInSec = time.time()
+	if( (1000 * currTimeInSec - timeFromClbkMsg) > 1750 ):
+		traderFunctions.ploggerInfo('Warn - Websocket - delay is ' + str(1000 * currTimeInSec - timeFromClbkMsg) + ' miliSec', False)
 		# but skip only if you did not skip in the last 2 sec (in case the msgs would be coming with a delay)
-		# commenting some bits out because clogging the log
 		if not ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileSkipClbkMsgDueDelay, 2) ):
-			# traderFunctions.ploggerInfo('Warn - Websocket - SKIPPING this clbk msg', False)
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
-		# else:
-		#	traderFunctions.ploggerInfo('Warn - Websocket - Did skip a clbk msg in the last 2 seconds, so NOT skipping this one', False)
 	
 	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 		
@@ -196,14 +199,16 @@ def trader_callbck(msg):
 		globalVariablesDictionary.update(tmp)
 		updateJsons(tmp)
 	
-	if ( clbkCounterForGuardian < 1 ):
+	if ( nextTimeForGuardianReport < currTimeInSec ):
+		global nextTimeForGuardianReport
 		traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
-		clbkCounterForGuardian = traderFunctions.setclbkCounterForGuardian(guardian_loopTimeInMin)
+		nextTimeForGuardianReport = nextTimeForGuardianReport + guardian_loopTimeInSec
 	
 	# running the check for stopping the script every 90s
-	if(clbkCounterForGuardian % 90 == 0):
+	if ( nextTimeForFlagCheck < currTimeInSec ):
+		global nextTimeForFlagCheck
 		stopIfFlag(stopFlagFileName)
-
+		nextTimeForFlagCheck = nextTimeForFlagCheck + 90
 
 ######################################################
 #############		WEBSOCKET			##############
@@ -261,3 +266,4 @@ traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileGuardian)
 # 5, pre kazdy ucet budes mat array s velkostou Qty pre jednotlive nakupy, pri starte skritu updatenes aj tieto hodnoty
 # 6, convert small amounts to BNB
 startTraderSocket()
+printFirstClbkOccurence(time.time() - 5)

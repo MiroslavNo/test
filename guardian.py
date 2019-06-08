@@ -34,7 +34,7 @@ def restartSystem():
 			break
 		else:
 			# if the time is not right, wait for 60s and check again
-			ploggerInfo('GUARDIAN - Last Restart was lately, therefore going to wait and check again in a minute')
+			traderFunctions.ploggerInfo('GUARDIAN - Last Restart was lately, therefore going to wait and check again in a minute')
 			time.sleep(60)
 
 def hasInternet(host="8.8.8.8", port=53, timeout=3):

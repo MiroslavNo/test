@@ -234,12 +234,6 @@ def convertTimestampToEpoch(timestamp_str, epochInMiliseconds=True, timeStampFor
 
 	return epoch_time
 
-
-#################  PART OF THE GUARDIAN FUNCTIONALITY ################
-def setclbkCounterForGuardian(loopingTimeInMin):
-	# 1,25 je bezpecnostny koef
-	writingTimeInSec = int(round(loopingTimeInMin * 60 / 1.25))
-	return writingTimeInSec
 	
 #################  SYTEM TIME ################
 #prints the server time difference
