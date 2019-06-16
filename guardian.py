@@ -4,6 +4,7 @@ import datetime
 import re
 import socket
 import os
+import sys
 from collections import Counter
 
 # musi byt, lebo niektore metody z traderFunctions maju implementovany logging
@@ -92,8 +93,8 @@ def reconnectAndLoopWhileNoInternet():
 			pass
 		loopWhileNoInternet()
 
-def writeTimeIntoReportHTML():
-	htmlFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs\report.html'
+def writeTimeIntoReportHTML(clientName):
+	htmlFilePath = traderFunctions.getScriptLocationPath(1) + r'\ReportsAndLogs\report_' + clientName + '.html'
 	htmlFile = open(htmlFilePath, 'r')
 	htmlContent = htmlFile.read()
 	htmlFile.close()
@@ -232,7 +233,9 @@ def runGuardian():
 		
 		if ( traderFunctions.checkIfLastTimeOfThisEventWasLately(sharedPrefFileGuardian_lastClbkTime, int(round(guardian_loopTimeInMin*60))) ):
 			# confirm that everything OK
-			writeTimeIntoReportHTML()
+			for k, client in clients.items():
+				if (k !=  'mno'):
+					writeTimeIntoReportHTML(k)
 			counter=+1
 			if(counter % counterCycleForBNBUpdate == 0):
 				# TODO_future make more generic with the amount
@@ -244,6 +247,7 @@ def runGuardian():
 							# TODO neskor to asi odstran, elbo by sa mohlo stat ze akurat medzi json a skutocnostou prebehne nejaky sell, v podstate mas v tej metode aj logovanie, takze by stacilo keby si to zavola bez if
 							traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 							os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
+							sys.exit()
 			if(counter % counterCycleForBalanceUpdate == 0):
 				for k, client in clients.items():
 					# TODO_future the report now is suitable only for tibRick
@@ -282,6 +286,7 @@ if(traderFunctions.diffRealAndExpectCoinStocks(clients['tibRick'], 'tibRick')):
 	# TODO only in the testing phase, to prevent further damage
 	traderFunctions.ploggerErr ('Found a discrepancy in the stocks, going to stop the script')
 	os.system('"' + traderFunctions.getScriptLocationPath(1) + r'\batch\02_STOP tradeRunner.bat"')
+	sys.exit()
 runGuardian()
 traderFunctions.ploggerErr ('ERROR - THE GUARDIAN HAS STOPPED')
 	

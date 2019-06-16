@@ -71,12 +71,15 @@ i_OUTOFRANGE = 1000000
 STEP_NR = 'step'
 
 DEBUG = True
+SINGLETRADEPERLOOP = True
 
 
-def trade(client, jD, pricesFromTicker):
+def trade(client, jD, msg):
 
 	# key stands for the name of the json
 	# jD stands for jsonDictionary
+	# filter for only USDT pairs
+	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
 	price = pricesFromTicker.get(jD[A_SYMBOL], 0)
 
 	if (price==0):
@@ -137,6 +140,8 @@ def trade(client, jD, pricesFromTicker):
 				r = uTlimitBuy(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_SENSITIVITY], jD[A_MAX_LOSS])
 				if not (r is None):
 					tmp[strLadderStep] = r
+					if SINGLETRADEPERLOOP:
+						break
 			elif (stepDic[E_TYP]==LIMIT_SELL):
 				if DEBUG:
 					protocollFcionRun(UT_LIMIT_SELL, strLadderStep)
@@ -172,6 +177,8 @@ def trade(client, jD, pricesFromTicker):
 				r = lTlimitSell(client, price, strLadderStep, stepDic, jD[U_PRICE_QTY_REQS], jD[A_SYMBOL], jD[A_SENSITIVITY])
 				if not (r is None):
 					tmp[strLadderStep] = r
+					if SINGLETRADEPERLOOP:
+						break
 			elif (stepDic[E_TYP]==WAIT_TO_BUY):
 				if DEBUG:
 					protocollFcionRun(LT_WAITTO_BUY, strLadderStep)
@@ -192,6 +199,8 @@ def trade(client, jD, pricesFromTicker):
 						tmp_del.append(strLadderStep)
 						# adding the stepDic to tmp, so it will be recognized, that a change hapend -> adding the same value so it wont change anything
 						tmp[strLadderStep] = stepDic
+					if SINGLETRADEPERLOOP:
+						break
 			elif (stepDic[E_TYP] is None):
 				traderFunctions.ploggerErr(__name__ + ' / ' + jD[A_SYMBOL] +  ' - ' + ' the ladderStep Nr. ' + strLadderStep + ' from list_lTs_sortDesc could not be found in the jD[entries] dictionary - there must be a discrepancy in the data!')
 			else:

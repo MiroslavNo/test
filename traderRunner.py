@@ -182,13 +182,11 @@ def trader_callbck(msg):
 			traderFunctions.writeEventTimeInSharedPrefs(sharedPrefFileSkipClbkMsgDueDelay)
 			return
 	
-	pricesFromTicker = traderFunctions.getPricesFromClbkMsg(msg)
-		
 	tmp = {}
 	# TODO_future malo by to tak fungovat lepsie, ze traderFunctions by si prerobil na classu a dictionary spolu s clientom by boli member variables - tym padom by si nemusel volat funkciu s parametrami, ale vzdy by si iba zavolal metodu trade na danom objecte 
 	for k, singleJsonDic in globalVariablesDictionary.items():
 		try:
-			r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], singleJsonDic, pricesFromTicker)
+			r = strats[singleJsonDic['strategy']](clients[singleJsonDic['client']], singleJsonDic, msg)
 			if not (r is None):
 				tmp[k] = r
 		except Exception:

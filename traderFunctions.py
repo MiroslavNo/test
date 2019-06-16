@@ -480,6 +480,14 @@ def getPriceAndQtyReqs(tradedSymbol, client):
 
 	return r
 
+# TODO test
+def getPriceAndQtyReqsForAllCoins(client):
+	r = {}
+	# get all markets
+	for market, marketDic in market.items():
+		r[market] = getPriceAndQtyReqs(market, client)
+	return r
+
 def updatePriceAndQtyReqsInAllJsons(client, keyToBeUpdated, strategyFilter=None):
 	sharedPrefRootFolder = getScriptLocationPath(0) + r"\jsonTriggerFiles"
 	for file in os.listdir(sharedPrefRootFolder):
@@ -592,6 +600,9 @@ def diffRealAndExpectCoinStocks(client, clientName, defCoin='USDT', tolerancyInD
 		looping through trigger jsons, counting what amout of stocks I should have and comparing with the real numbers
 		not taking care of jsons which would have a coin in the which no longer exists -> in such case the whole json would crash
 	"""
+	#########	TURNING THIS FUNCTIONALITY OFF	#############
+	return False
+	
 	r = False
 	jsonStocks = {}
 	
